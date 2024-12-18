@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "913231085256",
+    "project_id": "smart-habit-tracker-6838b",
+    "storage_bucket": "smart-habit-tracker-6838b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:913231085256:android:67a2d4f49b5e3e7fb52ffd",
+        "android_client_info": {
+          "package_name": "com.example.smart_habit_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBT155edRCQhOc4Z_gN2A7_T7r_xaIQQs8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
