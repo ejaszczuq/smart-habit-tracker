@@ -1,8 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:smart_habit_tracker/auth/screens/register_screen.dart';
+import 'package:smart_habit_tracker/auth/screens/login_register_screen.dart';
 
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(const MyApp());
@@ -13,10 +13,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       title: 'Smart Habit Tracker',
-      home: RegisterScreen(),
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color.fromRGBO(40, 44, 52, 1.0),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color.fromRGBO(40, 44, 52, 1.0),
+        ),
+      ),
+      home: const LoginRegisterScreen(),
     );
   }
 }
-
