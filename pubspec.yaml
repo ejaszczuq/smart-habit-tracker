@@ -38,6 +38,8 @@ dependencies:
   cloud_firestore: ^5.5.1
   firebase_core: ^3.8.1
   firebase_auth: ^5.3.4
+  intl: ^0.20.1
+  scrollable_positioned_list: ^0.3.8
 
 dev_dependencies:
   flutter_test:
