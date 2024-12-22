@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/home_screen.dart';
@@ -18,12 +19,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
-  registration() async {
+  Future<void> registration() async {
     if (nameController.text.isNotEmpty && emailController.text.isNotEmpty) {
       try {
         // Create user with email and password
         UserCredential userCredential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(email: email, password: password);
+
+        // Save additional user data in Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user?.uid) // User ID as document ID
+            .set({
+          'name': nameController.text,
+          'email': emailController.text,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
         // Update profile with the user's name
         await userCredential.user?.updateProfile(displayName: name);
