@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/auth/screens/login_register_screen.dart';
+import 'package:smart_habit_tracker/navigation/main_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,7 @@ class MyApp extends StatelessWidget {
           backgroundColor: T.white_1,
         ),
       ),
-      home: const LoginRegisterScreen(),
+      home: const MainNavigation(),
     );
   }
 }
