@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:smart_habit_tracker/screens/home_screen.dart';
+import 'package:smart_habit_tracker/home_screen.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: Colors.orangeAccent,
             content: Text(
               errorMessage,
-              style: const TextStyle(fontSize: 18.0),
+              style: T.bodyRegular,
             ),
           ),
         );
@@ -79,7 +80,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(
-          title: const Text('Ekran logowania'),
+          title: Text(
+            'Ekran logowania',
+            style: T.h2,
+          ),
         ),
         body: Form(
           key: _formKey,
@@ -123,17 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Container(
                   width: MediaQuery.of(context).size.width,
                   padding: const EdgeInsets.symmetric(
-                      vertical: 13.0, horizontal: 30.0),
+                    vertical: 13.0,
+                    horizontal: 30.0,
+                  ),
                   decoration: BoxDecoration(
-                      color: const Color(0xFF273671),
-                      borderRadius: BorderRadius.circular(30)),
-                  child: const Center(
+                    color: T.violet_0,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Center(
                     child: Text(
                       'Login',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22.0,
-                          fontWeight: FontWeight.w500),
+                      style: T.bodyLargeBold,
                     ),
                   ),
                 ),
