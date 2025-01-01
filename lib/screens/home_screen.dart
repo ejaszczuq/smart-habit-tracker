@@ -99,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: CalendarWidget(),
+      body: const CalendarWidget(),
     );
   }
 }
