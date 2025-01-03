@@ -126,9 +126,12 @@ class T {
   //--- BUTTON ---
   static ButtonStyle buttonStandard = ElevatedButton.styleFrom(
     backgroundColor: violet_0,
+    foregroundColor: white_0,
+    textStyle: h3,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12.0),
     ),
+    minimumSize: const Size(350, 50),
   );
 
   //  static ButtonStyle buttonGradient = ElevatedButton.styleFrom(

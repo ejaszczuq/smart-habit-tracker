@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/auth/screens/register_screen.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
 import 'login_screen.dart';
 
@@ -11,7 +12,7 @@ class LoginRegisterScreen extends StatefulWidget {
 }
 
 class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
-  bool isLogin = true; // Flaga wskazująca, który ekran jest aktywny
+  bool isLogin = true;
 
   void toggle() {
     setState(() {
@@ -22,14 +23,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login / Register'),
-      ),
+      appBar: AppBar(),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding:
+                const EdgeInsets.only(bottom: 60.0, left: 16.0, right: 16.0),
             child: GestureDetector(
               onTap: toggle,
               child: AnimatedContainer(
@@ -51,7 +51,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                         height: 50,
                         width: 125,
                         decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 39, 54, 112),
+                          color: T.violet_0,
                           borderRadius: BorderRadius.circular(25),
                         ),
                       ),
@@ -64,7 +64,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                             child: Text(
                               'Login',
                               style: TextStyle(
-                                color: isLogin ? Colors.white : Colors.black,
+                                color: isLogin ? T.white_0 : T.black_0,
                               ),
                             ),
                           ),
@@ -74,7 +74,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                             child: Text(
                               'Sign Up',
                               style: TextStyle(
-                                color: !isLogin ? Colors.white : Colors.black,
+                                color: !isLogin ? T.white_0 : T.black_0,
                               ),
                             ),
                           ),
