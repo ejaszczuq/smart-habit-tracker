@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:smart_habit_tracker/navigation/main_navigation.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:smart_habit_tracker/screens/home_screen.dart';
-import 'package:smart_habit_tracker/home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -59,10 +58,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           );
 
-          Navigator.push(
+          Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => const HomeScreen(),
+              builder: (context) => const MainNavigation(),
             ),
           );
         }

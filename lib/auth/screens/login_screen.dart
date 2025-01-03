@@ -1,10 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:smart_habit_tracker/home_screen.dart';
+import 'package:smart_habit_tracker/navigation/main_navigation.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
-import '../../screens/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,20 +23,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
   userLogin() async {
     try {
+      email = emailController.text.trim();
+      password = passwordController.text;
+
       await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
 
       if (mounted) {
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const HomeScreen(),
+            builder: (context) => const MainNavigation(),
           ),
         );
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String errorMessage = '';
+        String errorMessage = 'An unknown error occurred. Please try again.';
         if (e.code == 'user-not-found') {
           errorMessage = 'No User Found for that Email';
         } else if (e.code == 'wrong-password') {
