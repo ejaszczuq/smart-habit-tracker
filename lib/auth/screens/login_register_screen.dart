@@ -23,10 +23,6 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          isLogin ? 'Login' : 'Sign Up',
-          style: T.h2.copyWith(color: T.black_1),
-        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
