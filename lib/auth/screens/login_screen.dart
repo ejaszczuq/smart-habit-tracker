@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: Colors.orangeAccent,
+            backgroundColor: T.violet_1,
             content: Text(
               errorMessage,
               style: T.bodyRegular,
@@ -175,14 +175,24 @@ class _LoginScreenState extends State<LoginScreen> {
                               blendMode: BlendMode.srcIn,
                               child: SvgPicture.asset(
                                 'assets/icons/password-icon.svg',
-                                color: T.white_1,
                               ),
                             ),
                           ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 25,
-                            minHeight: 25,
+                          suffixIcon: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
+                            child: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: T.grey_1,
+                            ),
                           ),
+                          prefixIconConstraints:
+                              const BoxConstraints(minWidth: 30, minHeight: 30),
                           contentPadding:
                               const EdgeInsets.only(top: 10, bottom: 10),
                         ),
@@ -198,28 +208,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Checkbox(
-                              value: isPasswordVisible,
-                              onChanged: (value) {
-                                setState(() {
-                                  isPasswordVisible = value ?? false;
-                                });
-                              },
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            Transform.translate(
-                              offset: const Offset(-5, 0),
-                              child: const Text('Show Password'),
-                            ),
-                          ],
-                        ),
                         const SizedBox(width: 90),
                         Transform.translate(
-                          offset: const Offset(-12, 0),
+                          offset: const Offset(56, 0),
                           child: GestureDetector(
                             onTap: () {},
                             child: const Text(
