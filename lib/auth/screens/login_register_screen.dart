@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/auth/screens/register_screen.dart';
+import 'package:smart_habit_tracker/auth/screens/login_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
-
-import 'login_screen.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
   const LoginRegisterScreen({super.key});
 
   @override
-  State<StatefulWidget> createState() => _LoginRegisterScreenState();
+  State<LoginRegisterScreen> createState() => _LoginRegisterScreenState();
 }
 
 class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
@@ -23,13 +22,17 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+      ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Padding(
             padding:
-                const EdgeInsets.only(bottom: 60.0, left: 16.0, right: 16.0),
+                const EdgeInsets.only(bottom: 30.0, left: 16.0, right: 16.0),
             child: GestureDetector(
               onTap: toggle,
               child: AnimatedContainer(
@@ -65,6 +68,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                               'Login',
                               style: TextStyle(
                                 color: isLogin ? T.white_0 : T.black_0,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -75,6 +79,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                               'Sign Up',
                               style: TextStyle(
                                 color: !isLogin ? T.white_0 : T.black_0,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -91,7 +96,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
-              child: isLogin ? const LoginScreen() : const RegisterScreen(),
+              child: isLogin
+                  ? LoginScreen(
+                      onToggle: toggle,
+                    )
+                  : RegisterScreen(
+                      onToggle: toggle,
+                    ),
             ),
           ),
         ],

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:smart_habit_tracker/navigation/main_navigation.dart';
@@ -7,7 +8,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final VoidCallback onToggle;
+
+  const RegisterScreen({super.key, required this.onToggle});
 
   @override
   State<StatefulWidget> createState() => _RegisterScreenState();
@@ -18,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool isPasswordVisible = false;
   bool isConfirmPasswordVisible = false;
+  bool isTermsAccepted = false;
 
   TextEditingController nameController = TextEditingController();
   TextEditingController emailController = TextEditingController();
@@ -27,7 +31,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
   Future<void> registration() async {
-    if (nameController.text.isNotEmpty && emailController.text.isNotEmpty) {
+    if (_formKey.currentState!.validate()) {
+      // Update the email and password variables from the TextEditingController
+      email = emailController.text.trim();
+      password = passwordController.text.trim();
+
       try {
         UserCredential userCredential =
             await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -35,17 +43,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password: password,
         );
 
+        // Store user details in Firestore
         await FirebaseFirestore.instance
             .collection('users')
             .doc(userCredential.user?.uid)
             .set({
-          'name': nameController.text,
-          'email': emailController.text,
+          'name': nameController.text.trim(),
+          'email': emailController.text.trim(),
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        await userCredential.user?.updateProfile(displayName: name);
-
+        await userCredential.user
+            ?.updateProfile(displayName: nameController.text.trim());
         await userCredential.user?.reload();
 
         if (mounted) {
@@ -70,7 +79,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (e.code == 'weak-password') {
           errorMessage = 'Password Provided is too Weak';
         } else if (e.code == 'email-already-in-use') {
-          errorMessage = 'Account Already exists';
+          errorMessage = 'Account Already Exists';
         } else {
           errorMessage = 'An error occurred. Please try again.';
         }
@@ -137,340 +146,307 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
-
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              //const SizedBox(height: 2.0),
-              Container(
-                width: 120,
-                height: 120,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: T.grey_0.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                child: Text(
-                  'Placeholder for image',
-                  style: T.bodyRegular.copyWith(color: T.grey_1),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 16.0),
-              Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Name
-                    SizedBox(
-                      width: 305,
-                      child: TextFormField(
-                        controller: nameController,
-                        decoration: InputDecoration(
-                          labelText: 'Name',
-                          hintText: 'Your full name',
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 0, right: 10),
-                            child: ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return T.gradient_0.createShader(bounds);
-                              },
-                              blendMode: BlendMode.srcIn,
-                              child: SvgPicture.asset(
-                                'assets/icons/write-icon.svg',
-                              ),
-                            ),
-                          ),
-                          prefixIconConstraints:
-                              const BoxConstraints(minWidth: 30, minHeight: 30),
-                          contentPadding:
-                              const EdgeInsets.only(top: 10, bottom: 10),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your name';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-
-                    // Email
-                    SizedBox(
-                      width: 305,
-                      child: TextFormField(
-                        controller: emailController,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          hintText: 'email@example.com',
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 0, right: 10),
-                            child: ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return T.gradient_0.createShader(bounds);
-                              },
-                              blendMode: BlendMode.srcIn,
-                              child: SvgPicture.asset(
-                                'assets/icons/email-icon.svg',
-                              ),
-                            ),
-                          ),
-                          prefixIconConstraints:
-                              const BoxConstraints(minWidth: 30, minHeight: 30),
-                          contentPadding:
-                              const EdgeInsets.only(top: 10, bottom: 10),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-
-                    // Password
-                    SizedBox(
-                      width: 305,
-                      child: TextFormField(
-                        controller: passwordController,
-                        obscureText: !isPasswordVisible,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: '*******',
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 0, right: 10),
-                            child: ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return T.gradient_0.createShader(bounds);
-                              },
-                              blendMode: BlendMode.srcIn,
-                              child: SvgPicture.asset(
-                                'assets/icons/password-icon.svg',
-                              ),
-                            ),
-                          ),
-                          suffixIcon: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                isPasswordVisible = !isPasswordVisible;
-                              });
-                            },
-                            child: Icon(
-                              isPasswordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: T.grey_1,
-                            ),
-                          ),
-                          prefixIconConstraints:
-                              const BoxConstraints(minWidth: 30, minHeight: 30),
-                          contentPadding:
-                              const EdgeInsets.only(top: 10, bottom: 10),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12.0),
-
-                    // Confirm Password
-                    SizedBox(
-                      width: 305,
-                      child: TextFormField(
-                        controller: confirmPasswordController,
-                        obscureText: !isConfirmPasswordVisible,
-                        decoration: InputDecoration(
-                          labelText: 'Confirm Password',
-                          hintText: '*******',
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 0, right: 10),
-                            child: ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return T.gradient_0.createShader(bounds);
-                              },
-                              blendMode: BlendMode.srcIn,
-                              child: SvgPicture.asset(
-                                'assets/icons/password-icon.svg',
-                              ),
-                            ),
-                          ),
-                          suffixIcon: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                isConfirmPasswordVisible =
-                                    !isConfirmPasswordVisible;
-                              });
-                            },
-                            child: Icon(
-                              isConfirmPasswordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: T.grey_1,
-                            ),
-                          ),
-                          prefixIconConstraints:
-                              const BoxConstraints(minWidth: 30, minHeight: 30),
-                          contentPadding:
-                              const EdgeInsets.only(top: 10, bottom: 10),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please confirm your password';
-                          }
-                          if (value != passwordController.text) {
-                            return 'Passwords do not match';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24.0),
-
-                    // Sign Up button
-                    SizedBox(
-                      width: 315,
-                      child: CustomButton(
-                        text: 'Sign Up',
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            setState(() {
-                              name = nameController.text;
-                              email = emailController.text;
-                              password = passwordController.text;
-                              confirmPassword = confirmPasswordController.text;
-                            });
-                            registration();
-                          }
-                        },
-                        style: T.buttonStandard.copyWith(
-                          backgroundColor:
-                              MaterialStateProperty.all(T.violet_0),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24.0),
-
-                    // Google / Apple signup
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                children: [
+                  Form(
+                    key: _formKey,
+                    child: Column(
                       children: [
-                        Container(
-                          width: 150,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12.0,
-                            horizontal: 16.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white30,
-                            border: Border.all(
-                              color: T.grey_0,
-                              width: 1,
+                        // Name
+                        SizedBox(
+                          width: 305,
+                          child: TextFormField(
+                            controller: nameController,
+                            decoration: InputDecoration(
+                              labelText: 'Name',
+                              hintText: 'Your full name',
+                              prefixIcon: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 0, right: 10),
+                                child: ShaderMask(
+                                  shaderCallback: (Rect bounds) {
+                                    return T.gradient_0.createShader(bounds);
+                                  },
+                                  blendMode: BlendMode.srcIn,
+                                  child: SvgPicture.asset(
+                                    'assets/icons/write-icon.svg',
+                                  ),
+                                ),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 30, minHeight: 30),
+                              contentPadding:
+                                  const EdgeInsets.only(top: 10, bottom: 10),
                             ),
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Sign up',
-                                    style: T.bodyRegularBold
-                                        .copyWith(color: T.black_1),
-                                  ),
-                                  Text(
-                                    'with Google',
-                                    style:
-                                        T.bodyRegular.copyWith(color: T.grey_1),
-                                  ),
-                                ],
-                              ),
-                              SvgPicture.asset(
-                                'assets/icons/google-icon.svg',
-                                width: 24,
-                                height: 24,
-                              ),
-                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your name';
+                              }
+                              return null;
+                            },
                           ),
                         ),
-                        const SizedBox(width: 12.0),
-                        Container(
-                          width: 150,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12.0,
-                            horizontal: 16.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white30,
-                            border: Border.all(
-                              color: T.grey_0,
-                              width: 1,
+                        const SizedBox(height: 8.0),
+
+                        // Email
+                        SizedBox(
+                          width: 305,
+                          child: TextFormField(
+                            controller: emailController,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              hintText: 'email@example.com',
+                              prefixIcon: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 0, right: 10),
+                                child: ShaderMask(
+                                  shaderCallback: (Rect bounds) {
+                                    return T.gradient_0.createShader(bounds);
+                                  },
+                                  blendMode: BlendMode.srcIn,
+                                  child: SvgPicture.asset(
+                                    'assets/icons/email-icon.svg',
+                                  ),
+                                ),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 30, minHeight: 30),
+                              contentPadding:
+                                  const EdgeInsets.only(top: 10, bottom: 10),
                             ),
-                            borderRadius: BorderRadius.circular(16.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              return null;
+                            },
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Sign up',
-                                    style: T.bodyRegularBold
-                                        .copyWith(color: T.black_1),
+                        ),
+                        const SizedBox(height: 12.0),
+
+                        // Password
+                        SizedBox(
+                          width: 305,
+                          child: TextFormField(
+                            controller: passwordController,
+                            obscureText: !isPasswordVisible,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              hintText: '*******',
+                              prefixIcon: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 0, right: 10),
+                                child: ShaderMask(
+                                  shaderCallback: (Rect bounds) {
+                                    return T.gradient_0.createShader(bounds);
+                                  },
+                                  blendMode: BlendMode.srcIn,
+                                  child: SvgPicture.asset(
+                                    'assets/icons/password-icon.svg',
                                   ),
-                                  Text(
-                                    'with Apple',
-                                    style:
-                                        T.bodyRegular.copyWith(color: T.grey_1),
+                                ),
+                              ),
+                              suffixIcon: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    isPasswordVisible = !isPasswordVisible;
+                                  });
+                                },
+                                child: Icon(
+                                  isPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: T.grey_1,
+                                ),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 30, minHeight: 30),
+                              contentPadding:
+                                  const EdgeInsets.only(top: 10, bottom: 10),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your password';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 12.0),
+
+                        // Confirm Password
+                        SizedBox(
+                          width: 305,
+                          child: TextFormField(
+                            controller: confirmPasswordController,
+                            obscureText: !isConfirmPasswordVisible,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              hintText: '*******',
+                              prefixIcon: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 0, right: 10),
+                                child: ShaderMask(
+                                  shaderCallback: (Rect bounds) {
+                                    return T.gradient_0.createShader(bounds);
+                                  },
+                                  blendMode: BlendMode.srcIn,
+                                  child: SvgPicture.asset(
+                                    'assets/icons/password-icon.svg',
                                   ),
-                                ],
+                                ),
                               ),
-                              SvgPicture.asset(
-                                'assets/icons/apple-icon.svg',
-                                width: 24,
-                                height: 24,
+                              suffixIcon: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    isConfirmPasswordVisible =
+                                        !isConfirmPasswordVisible;
+                                  });
+                                },
+                                child: Icon(
+                                  isConfirmPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                  color: T.grey_1,
+                                ),
                               ),
-                            ],
+                              prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 30, minHeight: 30),
+                              contentPadding:
+                                  const EdgeInsets.only(top: 10, bottom: 10),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm your password';
+                              }
+                              if (value != passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16.0),
+
+                        // Terms and Conditions Checkbox
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Checkbox(
+                              value: isTermsAccepted,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  isTermsAccepted = value ?? false;
+                                });
+                              },
+                            ),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: T.bodyRegular.copyWith(
+                                    color: Colors.black,
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                        text:
+                                            'By registering, you agree to the '),
+                                    TextSpan(
+                                      text: 'Terms of Use',
+                                      style: const TextStyle(
+                                        color: T.violet_0,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          print('Terms of Use tapped');
+                                        },
+                                    ),
+                                    const TextSpan(text: ' and '),
+                                    TextSpan(
+                                      text: 'Privacy Policy',
+                                      style: const TextStyle(
+                                        color: T.violet_0,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          print('Privacy Policy tapped');
+                                        },
+                                    ),
+                                    const TextSpan(text: '.'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+
+                        // Sign Up Button
+                        SizedBox(
+                          width: 315,
+                          child: CustomButton(
+                            text: 'Sign Up',
+                            onPressed: () {
+                              if (!_formKey.currentState!.validate()) {
+                                return;
+                              }
+                              if (!isTermsAccepted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please accept the terms and conditions to proceed.',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              // Call the registration function
+                              registration();
+                            },
+                            style: T.buttonStandard.copyWith(
+                              backgroundColor:
+                                  WidgetStateProperty.all(T.violet_0),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32.0),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+          // Spacer ensures this row is at the bottom of the screen
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Already have an account? ',
+                  style: T.bodyRegular.copyWith(color: T.grey_1),
+                ),
+                GestureDetector(
+                  onTap: widget.onToggle,
+                  child: Text(
+                    'Log in',
+                    style: T.bodyRegularBold.copyWith(
+                      color: T.violet_0,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
