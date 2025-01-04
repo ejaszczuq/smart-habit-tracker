@@ -100,7 +100,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
-              child: isLogin ? const LoginScreen() : const RegisterScreen(),
+              child: isLogin
+                  ? LoginScreen(
+                      onToggle: toggle,
+                    )
+                  : RegisterScreen(
+                      onToggle: toggle,
+                    ),
             ),
           ),
         ],
