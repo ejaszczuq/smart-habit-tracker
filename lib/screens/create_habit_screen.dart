@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:smart_habit_tracker/widgets/custom_button.dart';
+
+import '../typography.dart';
 
 class CreateHabitScreen extends StatefulWidget {
   const CreateHabitScreen({super.key});
@@ -8,153 +11,234 @@ class CreateHabitScreen extends StatefulWidget {
 }
 
 class _CreateHabitScreenState extends State<CreateHabitScreen> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-
-  final List<String> _phaseTitles = [
-    'Select a Category',
-    'Evaluation Method',
-    'Define Your Habit',
-    'How Often?',
-  ];
-
-  String _selectedCategory = '';
+  String selectedIconLabel = 'Running';
+  String selectedColorLabel = 'Violet';
+  IconData? selectedIcon;
+  Color? selectedColor = Colors.purple;
   String _evaluationMethod = '';
-
-  void _onPageChanged(int page) {
-    setState(() {
-      _currentPage = page;
-    });
-  }
-
-  void _nextPage() {
-    if (_currentPage < _phaseTitles.length - 1) {
-      _pageController.animateToPage(
-        _currentPage + 1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
-  void _previousPage() {
-    if (_currentPage > 0) {
-      _pageController.animateToPage(
-        _currentPage - 1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
+  int? selectedIndex;
+  final Set<String> _selectedDaysOfWeek = {};
+  final Set<int> _selectedDaysOfMonth = {};
+  final List<String> _selectedDates = [];
+  final TextEditingController _daysController = TextEditingController();
+  String _selectedPeriod = 'Week';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_phaseTitles[_currentPage]),
+        title: const Text('Create Habit'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: _onPageChanged,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildSelectCategoryPage(),
-                _buildEvaluationMethodPage(),
-                _buildDefineHabitPage(),
-                _buildFrequencyPage(),
-              ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDefineHabitSection(),
+            const SizedBox(height: 24),
+            _buildIconAndColorPickerSection(),
+            const SizedBox(height: 24),
+            _buildEvaluationMethodSection(),
+            const SizedBox(height: 24),
+            _buildFrequencySection(),
+            const SizedBox(height: 24),
+            Center(
+              child: CustomButton(
+                text: 'Create',
+                onPressed: () {},
+                style: T.buttonStandard,
+              ),
             ),
-          ),
-          _buildNavigationControls(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavigationControls() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          if (_currentPage > 0)
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _previousPage,
-            )
-          else
-            const SizedBox(width: 48), // Placeholder for alignment
-          _buildDotsIndicator(),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward),
-            onPressed:
-                _currentPage < _phaseTitles.length - 1 ? _nextPage : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDotsIndicator() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        _phaseTitles.length,
-        (index) => AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: _currentPage == index ? 12 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: _currentPage == index ? Colors.blue : Colors.grey,
-            borderRadius: BorderRadius.circular(4),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSelectCategoryPage() {
-    final List<Map<String, dynamic>> categories = [
+  Widget _buildIconAndColorPickerSection() {
+    final List<Map<String, dynamic>> icons = [
+      {'icon': Icons.run_circle, 'label': 'Running'},
+      {'icon': Icons.directions_walk, 'label': 'Walking'},
       {'icon': Icons.fitness_center, 'label': 'Fitness'},
-      {'icon': Icons.book, 'label': 'Reading'},
-      {'icon': Icons.brush, 'label': 'Creativity'},
-      {'icon': Icons.work, 'label': 'Work'},
+      {'icon': Icons.sports, 'label': 'Sports'},
+      {'icon': Icons.directions_bike_sharp, 'label': 'Cycling'},
     ];
 
-    return GridView(
-      padding: const EdgeInsets.all(24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 6 / 2,
-        crossAxisSpacing: 5,
-        mainAxisSpacing: 5,
-      ),
-      children: categories
-          .map(
-            (category) => ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _selectedCategory = category['label'];
-                });
-                _nextPage();
-              },
-              icon: Icon(category['icon']),
-              label: Text(category['label']),
+    final List<Map<String, dynamic>> colors = [
+      {'color': Colors.red, 'label': 'Red'},
+      {'color': Colors.blue, 'label': 'Blue'},
+      {'color': Colors.green, 'label': 'Green'},
+      {'color': Colors.orange, 'label': 'Orange'},
+      {'color': Colors.purple, 'label': 'Violet'},
+    ];
+
+    void openIconPicker(BuildContext context) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Pick an Icon"),
+            content: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: icons.map((iconData) {
+                return IconButton(
+                  icon: Icon(iconData['icon'], size: 30),
+                  onPressed: () {
+                    setState(() {
+                      selectedIcon = iconData['icon'];
+                      selectedIconLabel = iconData['label'];
+                    });
+                    Navigator.of(context).pop();
+                  },
+                );
+              }).toList(),
             ),
-          )
-          .toList(),
+          );
+        },
+      );
+    }
+
+    void openColorPicker(BuildContext context) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Pick a Color"),
+            content: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: colors.map((colorData) {
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedColor = colorData['color'];
+                      selectedColorLabel = colorData['label'];
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorData['color'],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Icon and Color',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => openIconPicker(context),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 2,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        selectedIcon ?? Icons.run_circle,
+                        size: 40,
+                        color: Colors.black,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        selectedIconLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text(
+                        'Icon',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => openColorPicker(context),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 2,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: selectedColor ?? Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        selectedColorLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text(
+                        'Color',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildEvaluationMethodPage() {
+  Widget _buildEvaluationMethodSection() {
     final List<Map<String, dynamic>> evaluationMethods = [
       {'icon': Icons.toggle_on, 'label': 'Yes/No'},
       {'icon': Icons.exposure, 'label': 'Numeric'},
@@ -162,90 +246,72 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       {'icon': Icons.checklist, 'label': 'Checklist'},
     ];
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: evaluationMethods
-            .map(
-              (method) => ListTile(
-                leading: Icon(method['icon']),
-                title: Text(method['label']),
-                onTap: () {
-                  setState(() {
-                    _evaluationMethod = method['label'];
-                  });
-                  _nextPage();
-                },
-              ),
-            )
-            .toList(),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Evaluation Method',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        ...evaluationMethods.map(
+          (method) => ListTile(
+            leading: Icon(method['icon']),
+            title: Text(method['label']),
+            onTap: () {
+              setState(() {
+                _evaluationMethod = method['label'];
+              });
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildDefineHabitPage() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Habit',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildEvaluationSpecificFields(),
-          ],
+  Widget _buildDefineHabitSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Define Your Habit',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-      ),
+        const SizedBox(height: 16),
+        const TextField(
+          decoration: InputDecoration(
+            labelText: 'Name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        const TextField(
+          decoration: InputDecoration(
+            labelText: 'Description',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _buildEvaluationSpecificFields(),
+      ],
     );
   }
 
   Widget _buildEvaluationSpecificFields() {
     switch (_evaluationMethod) {
       case 'Yes/No':
-        return const Text(
-          'Define your habit with a Yes/No format.',
-          style: TextStyle(fontSize: 16),
-          textAlign: TextAlign.center,
-        );
+        return const Text('Define your habit with a Yes/No format.');
       case 'Numeric':
-        return const Text(
-          'Define your habit with numeric measurements.',
-          style: TextStyle(fontSize: 16),
-          textAlign: TextAlign.center,
-        );
+        return const Text('Define your habit with numeric measurements.');
       case 'Timer':
-        return const Text(
-          'Define your habit with a time duration.',
-          style: TextStyle(fontSize: 16),
-          textAlign: TextAlign.center,
-        );
+        return const Text('Define your habit with a time duration.');
       case 'Checklist':
-        return const Text(
-          'Define your habit with checklist items.',
-          style: TextStyle(fontSize: 16),
-          textAlign: TextAlign.center,
-        );
+        return const Text('Define your habit with checklist items.');
       default:
         return const SizedBox.shrink();
     }
   }
 
-  int? selectedIndex;
-
-  Widget _buildFrequencyPage() {
+  Widget _buildFrequencySection() {
     final List<String> frequencies = [
       "Every day",
       "Specific days of the week",
@@ -255,15 +321,23 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       "Repeat",
     ];
 
-    return Center(
-      child: ListView.builder(
-        itemCount: frequencies.length,
-        itemBuilder: (context, index) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'How Often?',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        ...frequencies.asMap().entries.map((entry) {
+          final index = entry.key;
+          final frequency = entry.value;
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CheckboxListTile(
-                title: Text(frequencies[index]),
+                title: Text(frequency),
                 controlAffinity: ListTileControlAffinity.leading,
                 value: selectedIndex == index,
                 onChanged: (bool? value) {
@@ -272,36 +346,30 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   });
                 },
               ),
-              if (selectedIndex == index && index != 0)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: _buildConfigurationWidget(index),
-                ),
+              if (selectedIndex == index) _buildConfigurationWidget(index),
             ],
           );
-        },
-      ),
+        }).toList(),
+      ],
     );
   }
 
   Widget _buildConfigurationWidget(int index) {
     switch (index) {
-      case 1: // Specific days of the week
+      case 1:
         return _buildDaysOfWeekPicker();
-      case 2: // Specific days of the month
+      case 2:
         return _buildDaysOfMonthPicker();
-      case 3: // Specific days of the year
+      case 3:
         return _buildDaysOfYearPicker();
-      case 4: // Some days per period
+      case 4:
         return _buildDaysPerPeriodPicker();
-      case 5: // Repeat
+      case 5:
         return _buildRepeatPicker();
       default:
         return const SizedBox.shrink();
     }
   }
-
-  final Set<String> _selectedDaysOfWeek = {};
 
   Widget _buildDaysOfWeekPicker() {
     return Column(
@@ -315,8 +383,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                 (day) => FilterChip(
                   label: Text(day),
                   selected: _selectedDaysOfWeek.contains(day),
-                  selectedColor: Colors.purple.shade100,
-                  showCheckmark: false, // Disable the tick icon
                   onSelected: (selected) {
                     setState(() {
                       if (selected) {
@@ -334,8 +400,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  final Set<int> _selectedDaysOfMonth = {};
-
   Widget _buildDaysOfMonthPicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,10 +410,8 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           children: List.generate(31, (index) => index + 1)
               .map(
                 (day) => FilterChip(
-                  label: Text('$day'), // Convert int to String
+                  label: Text('$day'),
                   selected: _selectedDaysOfMonth.contains(day),
-                  selectedColor: Colors.purple.shade100,
-                  showCheckmark: false, // Disable the tick icon
                   onSelected: (selected) {
                     setState(() {
                       if (selected) {
@@ -367,15 +429,24 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  final List<String> _selectedDates = [];
-
   void _openMonthDayPicker() async {
     int selectedMonth = 1;
     int selectedDay = 1;
 
     // Mapping for number of days in each month (leap year assumption for February)
     final monthDays = {
-      1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31
+      1: 31,
+      2: 29,
+      3: 31,
+      4: 30,
+      5: 31,
+      6: 30,
+      7: 31,
+      8: 31,
+      9: 30,
+      10: 31,
+      11: 30,
+      12: 31
     };
 
     // Controllers for ListWheelScrollViews
@@ -396,23 +467,27 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text("Month", style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text("Month",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(
-                          height: 120, // Show only the selected month and its neighbors
+                          height: 120,
+                          // Show only the selected month and its neighbors
                           child: ListWheelScrollView.useDelegate(
-                            controller: monthController, // Assign the controller here
+                            controller: monthController,
+                            // Assign the controller here
                             itemExtent: 40,
                             physics: const FixedExtentScrollPhysics(),
                             onSelectedItemChanged: (index) {
                               setDialogState(() {
                                 selectedMonth = index + 1;
-                                selectedDay = 1; // Reset to the first day when month changes
+                                selectedDay =
+                                    1; // Reset to the first day when month changes
                               });
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
                               children: List.generate(
                                 12,
-                                    (i) => GestureDetector(
+                                (i) => GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
                                       selectedMonth = i + 1;
@@ -426,8 +501,20 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                                         ? Colors.purple.shade100
                                         : Colors.transparent,
                                     child: Text(
-                                      ['January', 'February', 'March', 'April', 'May', 'June',
-                                        'July', 'August', 'September', 'October', 'November', 'December'][i],
+                                      [
+                                        'January',
+                                        'February',
+                                        'March',
+                                        'April',
+                                        'May',
+                                        'June',
+                                        'July',
+                                        'August',
+                                        'September',
+                                        'October',
+                                        'November',
+                                        'December'
+                                      ][i],
                                       style: TextStyle(
                                         fontSize: 16,
                                         color: selectedMonth == i + 1
@@ -452,11 +539,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text("Day", style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text("Day",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(
-                          height: 120, // Show only the selected day and its neighbors
+                          height: 120,
+                          // Show only the selected day and its neighbors
                           child: ListWheelScrollView.useDelegate(
-                            controller: dayController, // Assign the controller here
+                            controller: dayController,
+                            // Assign the controller here
                             itemExtent: 40,
                             physics: const FixedExtentScrollPhysics(),
                             onSelectedItemChanged: (index) {
@@ -466,8 +556,9 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
                               children: List.generate(
-                                monthDays[selectedMonth]!, // Get days based on selected month
-                                    (i) => GestureDetector(
+                                monthDays[selectedMonth]!,
+                                // Get days based on selected month
+                                (i) => GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
                                       selectedDay = i + 1;
@@ -514,7 +605,20 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   onPressed: () {
                     setState(() {
                       _selectedDates.add(
-                        "${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth - 1]} $selectedDay",
+                        "${[
+                          'January',
+                          'February',
+                          'March',
+                          'April',
+                          'May',
+                          'June',
+                          'July',
+                          'August',
+                          'September',
+                          'October',
+                          'November',
+                          'December'
+                        ][selectedMonth - 1]} $selectedDay",
                       );
                     });
                     Navigator.of(context).pop();
@@ -529,20 +633,15 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-
-
-
   Widget _buildDaysOfYearPicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text("Select specific dates of the year:"),
-        const SizedBox(height: 16),
         ElevatedButton(
           onPressed: _openMonthDayPicker,
           child: const Text("Pick Dates"),
         ),
-        const SizedBox(height: 16),
         Wrap(
           spacing: 8,
           children: _selectedDates
@@ -560,59 +659,33 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  final TextEditingController _daysController = TextEditingController();
-  String _selectedPeriod = 'Week'; // Default to week
-
   Widget _buildDaysPerPeriodPicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Specify the number of days per period:",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.purple.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.purple.shade200),
-          ),
-          child: Row(
-            children: [
-              // Input for number of days
-              Expanded(
-                child: TextField(
-                  controller: _daysController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: "Enter number of days",
-                    border: InputBorder.none,
-                  ),
-                ),
+        const Text("Specify the number of days per period:"),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _daysController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(hintText: "Enter number of days"),
               ),
-              const SizedBox(width: 10),
-              const Text('days per '),
-              const SizedBox(width: 30),
-              // Dropdown for selecting period type (week/month/year)
-              DropdownButton<String>(
-                value: _selectedPeriod,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPeriod = value!;
-                  });
-                },
-                items: ['Week', 'Month', 'Year']
-                    .map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
+            ),
+            DropdownButton<String>(
+              value: _selectedPeriod,
+              onChanged: (value) {
+                setState(() {
+                  _selectedPeriod = value!;
+                });
+              },
+              items: ['Week', 'Month', 'Year']
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
+            ),
+          ],
         ),
       ],
     );
@@ -623,31 +696,19 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text("Specify repeat interval:"),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.purple.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.purple.shade200),
-          ),
-          child: Row(
-            children: [
-              const Text('Every'),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _daysController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: "Enter number of days",
-                    border: InputBorder.none,
-                  ),
-                ),
+        Row(
+          children: [
+            const Text('Every'),
+            Expanded(
+              child: TextField(
+                controller: _daysController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(hintText: "Enter number of days"),
               ),
-              const SizedBox(width: 10),
-              const Text('days'),
-            ],
-          ),
+            ),
+            const Text('days'),
+          ],
         ),
       ],
     );
