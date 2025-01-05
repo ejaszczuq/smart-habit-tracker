@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class CalendarWidget extends StatefulWidget {
@@ -17,60 +19,75 @@ class CalendarWidgetState extends State<CalendarWidget> {
 
   late DateTime selectedDate;
   final ItemScrollController _scrollController = ItemScrollController();
+  List<Map<String, dynamic>> habits = [];
 
   @override
   void initState() {
     super.initState();
     selectedDate = DateTime.now();
+    _loadUserHabits();
   }
 
-  List<Map<String, dynamic>> habits = [
-    {
-      'Icon': const Icon(Icons.media_bluetooth_off),
-      'Name': 'Keep media off',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.abc_sharp),
-      'Name': 'Lorem ipsum',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.accessibility_new_rounded),
-      'Name': 'Lorem ipsum',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.media_bluetooth_off),
-      'Name': 'Keep media off',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.abc_sharp),
-      'Name': 'Lorem ipsum',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.accessibility_new_rounded),
-      'Name': 'Lorem ipsum',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.media_bluetooth_off),
-      'Name': 'Keep media off',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.abc_sharp),
-      'Name': 'Lorem ipsum',
-      'Description': 'Lorem ipsum '
-    },
-    {
-      'Icon': const Icon(Icons.accessibility_new_rounded),
-      'Name': 'Lorem ipsum',
-      'Description': 'Lorem ipsum '
-    },
-  ];
+  Future<void> _loadUserHabits() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('habits')
+          .get();
+
+      setState(() {
+        habits = querySnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'Icon': Icon(_getIconFromLabel(data['icon'])),
+            'Color': _getColorFromLabel(data['color']),
+            'Name': data['name'] ?? 'No name',
+            'Description': data['description'] ?? 'No description',
+          };
+        }).toList();
+      });
+    } catch (e) {
+      print('Error fetching habits: $e');
+    }
+  }
+
+  IconData _getIconFromLabel(String? label) {
+    switch (label) {
+      case 'Running':
+        return Icons.run_circle;
+      case 'Walking':
+        return Icons.directions_walk;
+      case 'Fitness':
+        return Icons.fitness_center;
+      case 'Sports':
+        return Icons.sports;
+      case 'Cycling':
+        return Icons.directions_bike_sharp;
+      default:
+        return Icons.help;
+    }
+  }
+
+  Color _getColorFromLabel(String? label) {
+    switch (label) {
+      case 'Red':
+        return Colors.red;
+      case 'Blue':
+        return Colors.blue;
+      case 'Green':
+        return Colors.green;
+      case 'Orange':
+        return Colors.orange;
+      case 'Violet':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +172,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
                   leading: habit['Icon'] as Icon,
                   title: Text(habit['Name']),
                   subtitle: Text(habit['Description']),
+                  tileColor: habit['Color'].withOpacity(0.1),
                 ),
               );
             },

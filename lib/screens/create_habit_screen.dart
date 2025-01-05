@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import '../typography.dart';
+import '../services/user_service.dart';
 
 class CreateHabitScreen extends StatefulWidget {
   const CreateHabitScreen({super.key});
@@ -11,6 +13,11 @@ class CreateHabitScreen extends StatefulWidget {
 }
 
 class _CreateHabitScreenState extends State<CreateHabitScreen> {
+  final UserService _userService = UserService();
+
+  // Form Fields
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
   String selectedIconLabel = 'Running';
   String selectedColorLabel = 'Violet';
   IconData? selectedIcon;
@@ -21,7 +28,48 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final Set<int> _selectedDaysOfMonth = {};
   final List<String> _selectedDates = [];
   final TextEditingController _daysController = TextEditingController();
-  String _selectedPeriod = 'Week';
+  String _selectedPeriod = '';
+
+  Future<void> _createHabit() async {
+    final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (uid.isEmpty) {
+      print('No user logged in');
+      return;
+    }
+
+    // Validate inputs
+    if (_nameController.text.isEmpty || _evaluationMethod.isEmpty) {
+      print('Please fill in all required fields');
+      return;
+    }
+
+    // Prepare habit data
+    final Map<String, dynamic> habitData = {
+      'name': _nameController.text,
+      'description': _descriptionController.text,
+      'icon': selectedIconLabel,
+      'color': selectedColorLabel,
+      'evaluationMethod': _evaluationMethod,
+      'frequency': {
+        'type': selectedIndex,
+        'daysOfWeek': _selectedDaysOfWeek.toList(),
+        'daysOfMonth': _selectedDaysOfMonth.toList(),
+        'specificDates': _selectedDates,
+        'daysPerPeriod': _daysController.text,
+        'periodType': _selectedPeriod,
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    // Save to Firestore
+    await _userService.saveHabit(uid, habitData);
+
+    // Show success message or navigate back
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Habit created successfully!')),
+    );
+    Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,13 +97,41 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             Center(
               child: CustomButton(
                 text: 'Create',
-                onPressed: () {},
+                onPressed: _createHabit,
                 style: T.buttonStandard,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDefineHabitSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Define Your Habit',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _nameController,
+          decoration: const InputDecoration(
+            labelText: 'Name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _descriptionController,
+          decoration: const InputDecoration(
+            labelText: 'Description',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -241,9 +317,9 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   Widget _buildEvaluationMethodSection() {
     final List<Map<String, dynamic>> evaluationMethods = [
       {'icon': Icons.toggle_on, 'label': 'Yes/No'},
-      {'icon': Icons.exposure, 'label': 'Numeric'},
-      {'icon': Icons.timer, 'label': 'Timer'},
-      {'icon': Icons.checklist, 'label': 'Checklist'},
+      // {'icon': Icons.exposure, 'label': 'Numeric'},
+      // {'icon': Icons.timer, 'label': 'Timer'},
+      // {'icon': Icons.checklist, 'label': 'Checklist'},
     ];
 
     return Column(
@@ -264,34 +340,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             },
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildDefineHabitSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Define Your Habit',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-        const TextField(
-          decoration: InputDecoration(
-            labelText: 'Name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 10),
-        const TextField(
-          decoration: InputDecoration(
-            labelText: 'Description',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 20),
-        _buildEvaluationSpecificFields(),
       ],
     );
   }
@@ -349,7 +397,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
               if (selectedIndex == index) _buildConfigurationWidget(index),
             ],
           );
-        }).toList(),
+        }),
       ],
     );
   }
