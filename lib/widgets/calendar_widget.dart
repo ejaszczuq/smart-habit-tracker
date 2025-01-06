@@ -17,7 +17,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
   late DateTime selectedDate;
   final ItemScrollController _scrollController = ItemScrollController();
   List<Map<String, dynamic>> habits = [];
-  Map<String, Map<String, bool>> completionStatus = {};
+  Map<String, Map<String, bool>> completionStatus = {}; // Tracks completion
 
   @override
   void initState() {
@@ -125,9 +125,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
           content: const Text('Are you sure you want to delete this habit?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
             TextButton(
@@ -146,14 +144,16 @@ class CalendarWidgetState extends State<CalendarWidget> {
   List<Map<String, dynamic>> _getHabitsForSelectedDate(DateTime date) {
     return habits.where((habit) {
       final frequency = habit['frequency'];
-      return _shouldDisplayHabit(frequency, date);
+      return _shouldDisplayHabit(habit, frequency, date);
     }).toList();
   }
 
-  bool _shouldDisplayHabit(Map<String, dynamic>? frequency, DateTime date) {
+  bool _shouldDisplayHabit(Map<String, dynamic> habit,
+      Map<String, dynamic>? frequency, DateTime date) {
     if (frequency == null) return false;
 
-    switch (frequency['type']) {
+    final type = frequency['type'];
+    switch (type) {
       case 0: // Every day
         return true;
       case 1: // Specific days of the week
@@ -168,14 +168,49 @@ class CalendarWidgetState extends State<CalendarWidget> {
             frequency['specificDates'] as List<dynamic>? ?? [];
         final formattedDate = DateFormat('MMMM d').format(date);
         return specificDates.contains(formattedDate);
+      case 4: // Show X times in a week/month/year
+        final period = frequency['periodType'] ?? 'Week';
+        final maxOccurrences = frequency['daysPerPeriod'] ?? 1;
+
+        final currentPeriodKey = _getCurrentPeriodKey(date, period);
+
+        // Fetch completions for the current period
+        final completions = frequency['completions'] ?? {};
+        final currentCompletions = completions[currentPeriodKey] ?? 0;
+
+        // Display habit if it hasn't been completed maxOccurrences times
+        return currentCompletions < maxOccurrences;
       case 5: // Repeat every X days
-        final startDate = frequency['startDate'] != null
-            ? DateTime.parse(frequency['startDate'])
-            : DateTime.now();
+        final startDateRaw = frequency['startDate'] ?? habit['createdAt'];
+        if (startDateRaw == null) return false;
+
+        DateTime startDate;
+        if (startDateRaw is Timestamp) {
+          startDate = startDateRaw.toDate();
+        } else if (startDateRaw is String) {
+          startDate = DateTime.parse(startDateRaw);
+        } else {
+          return false;
+        }
+
         final interval = frequency['interval'] as int? ?? 1;
-        return date.difference(startDate).inDays % interval == 0;
+        return !date.isBefore(startDate) &&
+            date.difference(startDate).inDays % interval == 0;
       default:
         return false;
+    }
+  }
+
+  String _getCurrentPeriodKey(DateTime date, String period) {
+    switch (period) {
+      case 'Week':
+        return DateFormat('yyyy-ww').format(date); // Year-Week format
+      case 'Month':
+        return DateFormat('yyyy-MM').format(date); // Year-Month format
+      case 'Year':
+        return DateFormat('yyyy').format(date); // Year format
+      default:
+        return DateFormat('yyyy-MM-dd').format(date); // Default to daily
     }
   }
 
@@ -224,14 +259,35 @@ class CalendarWidgetState extends State<CalendarWidget> {
           .collection('users')
           .doc(user.uid)
           .collection('habits')
-          .doc(habitId)
-          .collection('completion')
-          .doc(formattedDate);
+          .doc(habitId);
+
+      final completionRef =
+          habitRef.collection('completion').doc(formattedDate);
+
+      final habitSnapshot = await habitRef.get();
+      final habitData = habitSnapshot.data();
+      if (habitData == null) return;
+
+      final frequency = habitData['frequency'];
+      if (frequency == null || frequency['type'] != 4) return;
+
+      final period = frequency['periodType'] ?? 'Week';
+      final periodKey = _getCurrentPeriodKey(date, period);
 
       if (isCompleted) {
-        await habitRef.set({'completed': true});
+        await completionRef.set({'completed': true});
+
+        // Increment count for the current period
+        await habitRef.update({
+          'frequency.completions.$periodKey': FieldValue.increment(1),
+        });
       } else {
-        await habitRef.delete();
+        await completionRef.delete();
+
+        // Decrement count for the current period if unmarked
+        await habitRef.update({
+          'frequency.completions.$periodKey': FieldValue.increment(-1),
+        });
       }
 
       await _loadCompletionStatusForDate(date);
@@ -321,40 +377,47 @@ class CalendarWidgetState extends State<CalendarWidget> {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: ListView.builder(
-            itemCount: habitsForDate.length,
-            itemBuilder: (context, index) {
-              final habit = habitsForDate[index];
-              final habitId = habit['id'];
-              final completionDate =
-                  DateFormat('yyyy-MM-dd').format(selectedDate);
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _loadUserHabits(); // Reload all habits
+              await _loadCompletionStatusForDate(
+                  selectedDate); // Reload completion status for the selected date
+            },
+            child: ListView.builder(
+              itemCount: habitsForDate.length,
+              itemBuilder: (context, index) {
+                final habit = habitsForDate[index];
+                final habitId = habit['id'];
+                final completionDate =
+                    DateFormat('yyyy-MM-dd').format(selectedDate);
 
-              return GestureDetector(
-                onLongPress: () => _showDeleteDialog(habitId),
-                child: Card(
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 5, horizontal: 15),
-                  child: ListTile(
-                    leading: Icon(
-                      _getIconFromLabel(habit['icon'] as String?),
-                      color: _getColorFromLabel(habit['color'] as String?),
-                    ),
-                    title: Text(habit['name'] ?? 'No Name'),
-                    subtitle: Text(habit['description'] ?? 'No Description'),
-                    tileColor: _getColorFromLabel(habit['color'] as String?)
-                        .withOpacity(0.1),
-                    trailing: Checkbox(
-                      value:
-                          completionStatus[habitId]?[completionDate] ?? false,
-                      onChanged: (value) {
-                        _toggleHabitCompletion(
-                            habitId, selectedDate, value ?? false);
-                      },
+                return GestureDetector(
+                  onLongPress: () => _showDeleteDialog(habitId),
+                  child: Card(
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 5, horizontal: 15),
+                    child: ListTile(
+                      leading: Icon(
+                        _getIconFromLabel(habit['icon'] as String?),
+                        color: _getColorFromLabel(habit['color'] as String?),
+                      ),
+                      title: Text(habit['name'] ?? 'No Name'),
+                      subtitle: Text(habit['description'] ?? 'No Description'),
+                      tileColor: _getColorFromLabel(habit['color'] as String?)
+                          .withOpacity(0.1),
+                      trailing: Checkbox(
+                        value:
+                            completionStatus[habitId]?[completionDate] ?? false,
+                        onChanged: (value) {
+                          _toggleHabitCompletion(
+                              habitId, selectedDate, value ?? false);
+                        },
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ],

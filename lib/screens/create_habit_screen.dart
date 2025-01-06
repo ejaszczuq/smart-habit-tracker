@@ -66,9 +66,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             ? int.tryParse(_daysPerPeriodController.text)
             : null,
         'periodType': _selectedPeriod,
-        'repeatEvery': _repeatIntervalController.text.isNotEmpty
+        'interval': _repeatIntervalController.text.isNotEmpty
             ? int.tryParse(_repeatIntervalController.text)
             : null,
+        'startDate': DateTime.now().toIso8601String(), // Explicit startDate
       },
       'createdAt': FieldValue.serverTimestamp(),
     };
