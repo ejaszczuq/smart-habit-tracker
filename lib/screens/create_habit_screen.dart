@@ -27,8 +27,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final Set<String> _selectedDaysOfWeek = {};
   final Set<int> _selectedDaysOfMonth = {};
   final List<String> _selectedDates = [];
-  final TextEditingController _daysController = TextEditingController();
-  String _selectedPeriod = '';
+  final TextEditingController _daysPerPeriodController =
+      TextEditingController();
+  final TextEditingController _repeatIntervalController =
+      TextEditingController();
+  String? _selectedPeriod;
 
   Future<void> _createHabit() async {
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -52,23 +55,38 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       'evaluationMethod': _evaluationMethod,
       'frequency': {
         'type': selectedIndex,
-        'daysOfWeek': _selectedDaysOfWeek.toList(),
-        'daysOfMonth': _selectedDaysOfMonth.toList(),
-        'specificDates': _selectedDates,
-        'daysPerPeriod': _daysController.text,
+        'daysOfWeek': _selectedDaysOfWeek.isNotEmpty
+            ? _selectedDaysOfWeek.toList()
+            : null,
+        'daysOfMonth': _selectedDaysOfMonth.isNotEmpty
+            ? _selectedDaysOfMonth.toList()
+            : null,
+        'specificDates': _selectedDates.isNotEmpty ? _selectedDates : null,
+        'daysPerPeriod': _daysPerPeriodController.text.isNotEmpty
+            ? int.tryParse(_daysPerPeriodController.text)
+            : null,
         'periodType': _selectedPeriod,
+        'repeatEvery': _repeatIntervalController.text.isNotEmpty
+            ? int.tryParse(_repeatIntervalController.text)
+            : null,
       },
       'createdAt': FieldValue.serverTimestamp(),
     };
 
-    // Save to Firestore
-    await _userService.saveHabit(uid, habitData);
+    // Remove null entries
+    habitData['frequency'].removeWhere((key, value) => value == null);
 
-    // Show success message or navigate back
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Habit created successfully!')),
-    );
-    Navigator.pop(context);
+    try {
+      await _userService.saveHabit(uid, habitData);
+
+      // Show success message or navigate back
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Habit created successfully!')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error creating habit: $e');
+    }
   }
 
   @override
@@ -716,7 +734,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           children: [
             Expanded(
               child: TextField(
-                controller: _daysController,
+                controller: _daysPerPeriodController,
                 keyboardType: TextInputType.number,
                 decoration:
                     const InputDecoration(hintText: "Enter number of days"),
@@ -724,6 +742,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             ),
             DropdownButton<String>(
               value: _selectedPeriod,
+              hint: const Text('Select a period'),
               onChanged: (value) {
                 setState(() {
                   _selectedPeriod = value!;
@@ -749,7 +768,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             const Text('Every'),
             Expanded(
               child: TextField(
-                controller: _daysController,
+                controller: _repeatIntervalController,
                 keyboardType: TextInputType.number,
                 decoration:
                     const InputDecoration(hintText: "Enter number of days"),
