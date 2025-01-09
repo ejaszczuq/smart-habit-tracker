@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:smart_habit_tracker/services/user_service.dart';
 import 'package:smart_habit_tracker/widgets/calendar_widget.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -39,67 +40,64 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     String currentDate = DateFormat('EEE., d.MM.yy').format(DateTime.now());
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        flexibleSpace: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: 'Hi, ',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(120),
+        child: AppBar(
+          automaticallyImplyLeading: false,
+          elevation: 0,
+          backgroundColor: T.white_0,
+          flexibleSpace: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Hi, ',
+                                style: T.h1,
                               ),
-                            ),
-                            TextSpan(
-                              text: displayName,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.purple,
+                              TextSpan(
+                                text: displayName,
+                                style: T.h1.copyWith(color: T.purple_2),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        "Let's make habits together!",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
+                        Text(
+                          "Let's make habits together!",
+                          style: T.bodyRegular.copyWith(color: T.grey_1),
                         ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    currentDate,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    Text(
+                      currentDate,
+                      style: T.bodyLargeBold.copyWith(color: T.grey_1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
-      body: const CalendarWidget(),
+      body: const Column(
+        children: [
+          SizedBox(height: 10),
+          Expanded(
+            child: CalendarWidget(),
+          ),
+        ],
+      ),
     );
   }
 }

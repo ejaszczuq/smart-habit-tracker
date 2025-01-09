@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
 /// A widget that displays a scrollable calendar and a list of habits for the selected date.
 ///
@@ -486,13 +487,15 @@ class CalendarWidgetState extends State<CalendarWidget> {
       case 'Red':
         return Colors.red;
       case 'Blue':
-        return Colors.blue;
+        return T.blue_0;
       case 'Green':
         return Colors.green;
       case 'Orange':
         return Colors.orange;
       case 'Violet':
-        return Colors.purple;
+        return T.violet_2;
+      case 'Purple':
+        return T.purple_0;
       default:
         return Colors.grey;
     }
@@ -512,7 +515,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
       children: [
         /// Horizontal Calendar
         SizedBox(
-          height: 150,
+          height: 68, // Matches Figma height
           child: ScrollablePositionedList.builder(
             itemScrollController: _scrollController,
             initialScrollIndex: todayIndex >= 0 ? todayIndex : 0,
@@ -533,40 +536,36 @@ class CalendarWidgetState extends State<CalendarWidget> {
                   // Optionally fetch completion info for that day (if not pre-fetched).
                   await _loadCompletionStatusForDate(day);
                 },
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 65,
-                          height: 65,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isToday ? Colors.orange : Colors.purple,
-                          ),
-                          child: Center(
-                            child: Text(
-                              dayOfMonth,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          dayOfWeek,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
+                child: Container(
+                  width: 48,
+                  height: 68,
+                  margin: const EdgeInsets.symmetric(
+                      horizontal: 4), // Space between cards
+                  decoration: BoxDecoration(
+                    color: T.white_0,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isToday ? T.violet_0 : T.grey_2,
+                      width: 2,
                     ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize
+                        .min, // Ensures the column takes only the required space
+                    children: [
+                      Transform.translate(
+                        offset: const Offset(0, 4),
+                        child: Text(dayOfMonth, style: T.calendarNumbers),
+                      ),
+                      Transform.translate(
+                        offset: const Offset(0, -1),
+                        child: Text(
+                          dayOfWeek.toUpperCase(),
+                          style: T.captionSmallBold
+                              .copyWith(color: isToday ? T.violet_0 : T.grey_1),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );

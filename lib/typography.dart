@@ -9,6 +9,7 @@ class T {
   //--- GREY ---
   static const Color grey_0 = Color(0xFFC8C8C8);
   static const Color grey_1 = Color(0xFF9B9BA1);
+  static const Color grey_2 = Color(0xFFEAECF0);
 
   //--- BLACK ---
   static const Color black_0 = Color(0xFF000000);
@@ -122,6 +123,14 @@ class T {
     color: black_0,
   );
   //--- CAPTION ---
+
+  static final TextStyle calendarNumbers = GoogleFonts.anonymousPro(
+    fontSize: 20,
+    fontWeight: FontWeight.w500,
+    height: 1.71, // line-height: 24px / 14px = 1.71
+    fontStyle: FontStyle.italic,
+    color: const Color(0xFF040415),
+  );
 
   //--- BUTTON ---
   static ButtonStyle buttonStandard = ElevatedButton.styleFrom(
