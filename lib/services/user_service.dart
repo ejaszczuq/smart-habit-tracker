@@ -16,4 +16,17 @@ class UserService {
     }
     return null;
   }
+
+  Future<void> saveHabit(String uid, Map<String, dynamic> habitData) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('habits')
+          .add(habitData);
+      print('Habit saved successfully');
+    } catch (e) {
+      print('Error saving habit: $e');
+    }
+  }
 }
