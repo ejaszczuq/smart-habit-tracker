@@ -15,7 +15,7 @@ class CreateHabitScreen extends StatefulWidget {
 class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final UserService _userService = UserService();
 
-  // Form Fields
+  // Form fields
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   String selectedIconLabel = 'Running';
@@ -33,6 +33,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       TextEditingController();
   String? _selectedPeriod;
 
+  // For checklist items
+  final TextEditingController _checklistItemController =
+      TextEditingController();
+  final List<String> _checklistItems = [];
+
   Future<void> _createHabit() async {
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (uid.isEmpty) {
@@ -40,13 +45,13 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       return;
     }
 
-    // Validate inputs
+    // Basic validation
     if (_nameController.text.isEmpty || _evaluationMethod.isEmpty) {
       print('Please fill in all required fields');
       return;
     }
 
-    // Prepare habit data
+    // Prepare habit data to save
     final Map<String, dynamic> habitData = {
       'name': _nameController.text,
       'description': _descriptionController.text,
@@ -69,10 +74,15 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
         'interval': _repeatIntervalController.text.isNotEmpty
             ? int.tryParse(_repeatIntervalController.text)
             : null,
-        'startDate': DateTime.now().toIso8601String(), // Explicit startDate
+        'startDate': DateTime.now().toIso8601String(),
       },
       'createdAt': FieldValue.serverTimestamp(),
     };
+
+    // If evaluation method is Checklist, add subtasks
+    if (_evaluationMethod == 'Checklist') {
+      habitData['subTasks'] = _checklistItems;
+    }
 
     // Remove null entries
     habitData['frequency'].removeWhere((key, value) => value == null);
@@ -80,10 +90,13 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     try {
       await _userService.saveHabit(uid, habitData);
 
-      // Show success message or navigate back
+      // After the async call, ensure the widget is still mounted
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Habit created successfully!')),
       );
+
       Navigator.pop(context);
     } catch (e) {
       print('Error creating habit: $e');
@@ -110,6 +123,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             _buildIconAndColorPickerSection(),
             const SizedBox(height: 24),
             _buildEvaluationMethodSection(),
+            _buildEvaluationSpecificFields(),
             const SizedBox(height: 24),
             _buildFrequencySection(),
             const SizedBox(height: 24),
@@ -336,9 +350,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   Widget _buildEvaluationMethodSection() {
     final List<Map<String, dynamic>> evaluationMethods = [
       {'icon': Icons.toggle_on, 'label': 'Yes/No'},
+      {'icon': Icons.checklist, 'label': 'Checklist'},
+      // You can uncomment or add more:
       // {'icon': Icons.exposure, 'label': 'Numeric'},
       // {'icon': Icons.timer, 'label': 'Timer'},
-      // {'icon': Icons.checklist, 'label': 'Checklist'},
     ];
 
     return Column(
@@ -352,6 +367,9 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           (method) => ListTile(
             leading: Icon(method['icon']),
             title: Text(method['label']),
+            trailing: _evaluationMethod == method['label']
+                ? const Icon(Icons.check, color: Colors.green)
+                : null,
             onTap: () {
               setState(() {
                 _evaluationMethod = method['label'];
@@ -366,16 +384,84 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   Widget _buildEvaluationSpecificFields() {
     switch (_evaluationMethod) {
       case 'Yes/No':
-        return const Text('Define your habit with a Yes/No format.');
-      case 'Numeric':
-        return const Text('Define your habit with numeric measurements.');
-      case 'Timer':
-        return const Text('Define your habit with a time duration.');
+        return const Padding(
+          padding: EdgeInsets.only(top: 8.0),
+          child: Text('Define your habit with a Yes/No format.'),
+        );
       case 'Checklist':
-        return const Text('Define your habit with checklist items.');
+        return _buildChecklistFields();
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildChecklistFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        const Text(
+          'Checklist items:',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        Column(
+          children: _checklistItems
+              .asMap()
+              .entries
+              .map(
+                (entry) => Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text('- ${entry.value}')),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _checklistItems.removeAt(entry.key);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _checklistItemController,
+                decoration: const InputDecoration(
+                  labelText: 'Add sub-task',
+                ),
+                onSubmitted: (value) {
+                  final trimmed = value.trim();
+                  if (trimmed.isNotEmpty) {
+                    setState(() {
+                      _checklistItems.add(trimmed);
+                      _checklistItemController.clear();
+                    });
+                  }
+                },
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Colors.blue),
+              onPressed: () {
+                final text = _checklistItemController.text.trim();
+                if (text.isNotEmpty) {
+                  setState(() {
+                    _checklistItems.add(text);
+                    _checklistItemController.clear();
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   Widget _buildFrequencySection() {
@@ -500,7 +586,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     int selectedMonth = 1;
     int selectedDay = 1;
 
-    // Mapping for number of days in each month (leap year assumption for February)
+    // Mapping for number of days in each month
     final monthDays = {
       1: 31,
       2: 29,
@@ -516,7 +602,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       12: 31
     };
 
-    // Controllers for ListWheelScrollViews
     final monthController = FixedExtentScrollController();
     final dayController = FixedExtentScrollController();
 
@@ -538,17 +623,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(
                           height: 120,
-                          // Show only the selected month and its neighbors
                           child: ListWheelScrollView.useDelegate(
                             controller: monthController,
-                            // Assign the controller here
                             itemExtent: 40,
                             physics: const FixedExtentScrollPhysics(),
                             onSelectedItemChanged: (index) {
                               setDialogState(() {
                                 selectedMonth = index + 1;
-                                selectedDay =
-                                    1; // Reset to the first day when month changes
+                                selectedDay = 1;
                               });
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
@@ -559,7 +641,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                                     setDialogState(() {
                                       selectedMonth = i + 1;
                                     });
-                                    // Scroll to the tapped item
                                     monthController.jumpToItem(i);
                                   },
                                   child: Container(
@@ -610,10 +691,8 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(
                           height: 120,
-                          // Show only the selected day and its neighbors
                           child: ListWheelScrollView.useDelegate(
                             controller: dayController,
-                            // Assign the controller here
                             itemExtent: 40,
                             physics: const FixedExtentScrollPhysics(),
                             onSelectedItemChanged: (index) {
@@ -624,13 +703,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                             childDelegate: ListWheelChildLoopingListDelegate(
                               children: List.generate(
                                 monthDays[selectedMonth]!,
-                                // Get days based on selected month
                                 (i) => GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
                                       selectedDay = i + 1;
                                     });
-                                    // Scroll to the tapped item
                                     dayController.jumpToItem(i);
                                   },
                                   child: Container(
@@ -767,6 +844,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
         Row(
           children: [
             const Text('Every'),
+            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: _repeatIntervalController,
@@ -775,6 +853,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                     const InputDecoration(hintText: "Enter number of days"),
               ),
             ),
+            const SizedBox(width: 8),
             const Text('days'),
           ],
         ),
