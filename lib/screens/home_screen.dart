@@ -12,9 +12,6 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-final user = FirebaseAuth.instance.currentUser;
-final displayName = user?.displayName ?? 'User';
-
 class _HomeScreenState extends State<HomeScreen> {
   final UserService _userService = UserService();
   Map<String, dynamic>? userData;
@@ -26,19 +23,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadUserData() async {
-    String? uid = user?.uid;
-    Map<String, dynamic>? data = await _userService.getUserData(uid!);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    if (data != null) {
-      setState(() {
-        userData = data;
-      });
-    }
+    // Fetch Firestore data for this user (if exists)
+    final data = await _userService.getUserData(user.uid);
+    if (!mounted) return;
+
+    setState(() {
+      userData = data;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     String currentDate = DateFormat('EEE., d.MM.yy').format(DateTime.now());
+
+    // Always read the latest user from FirebaseAuth
+    final user = FirebaseAuth.instance.currentUser;
+
+    // Decide which name to display:
+    // 1) If Firestore user data has a "name", use that
+    // 2) Otherwise, fall back to user.displayName from Firebase Auth
+    // 3) Otherwise, default to "User"
+    final displayName = userData?['name'] ?? user?.displayName ?? 'User';
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(120),
@@ -54,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // Left Column: user's name, greeting, etc.
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -78,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
+                    // Right side: current date
                     Text(
                       currentDate,
                       style: T.bodyLargeBold.copyWith(color: T.grey_1),
