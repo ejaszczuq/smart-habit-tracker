@@ -61,6 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Logs in the user using email/password
   Future<void> userLogin() async {
     try {
       email = emailController.text.trim();
@@ -103,6 +104,79 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Displays a dialog to reset the password
+  Future<void> _showResetPasswordDialog() async {
+    // Pre-fill with whatever is in emailController, or leave it blank
+    final TextEditingController resetEmailController =
+        TextEditingController(text: emailController.text.trim());
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter your email to receive a password reset link:',
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: resetEmailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final resetEmail = resetEmailController.text.trim();
+                if (resetEmail.isNotEmpty) {
+                  try {
+                    await FirebaseAuth.instance
+                        .sendPasswordResetEmail(email: resetEmail);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Password reset link sent to $resetEmail',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      );
+                    }
+                  } on FirebaseAuthException catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            e.message ?? 'Error sending reset email',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                }
+
+                // Only pop if we are still mounted
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              },
+              child: const Text('Send Reset Email'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Sign in with Google. If the user doesn't exist, Firebase creates a new one.
   Future<void> signInWithGoogle() async {
     try {
@@ -124,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final UserCredential userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
 
-      // If it's a new user, create a document in Firestore
+      // If it's a new user, create a document in Firestore (optional)
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -140,8 +214,8 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const MainNavigation()),
       );
     } on FirebaseAuthException catch (e) {
-      debugPrint('Google Sign-In Firebase error: $e');
       if (!mounted) return;
+      debugPrint('Google Sign-In Firebase error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red,
@@ -149,8 +223,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } catch (e) {
-      debugPrint('Google Sign-In general error: $e');
       if (!mounted) return;
+      debugPrint('Google Sign-In general error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Colors.red,
@@ -162,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// Sign in with Apple (iOS/macOS only). If new, create doc in Firestore.
   Future<void> signInWithApple() async {
-    // If not on iOS/macOS, show an error or do nothing
+    // For Apple sign-in, ensure you have the correct setup on iOS/macOS
     if (!Platform.isIOS && !Platform.isMacOS) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -212,15 +286,6 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(e.message ?? 'Apple sign-in failed.'),
         ),
       );
-    } on SignInWithAppleAuthorizationException catch (e) {
-      debugPrint('Apple Sign-In error: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('Apple sign-in failed: ${e.message}'),
-        ),
-      );
     } catch (e) {
       debugPrint('Apple Sign-In general error: $e');
       if (!mounted) return;
@@ -254,8 +319,10 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Text('Welcome back!', style: T.h2),
               const SizedBox(height: 4),
-              Text('Enter your credentials to continue',
-                  style: T.bodyRegularBold.copyWith(color: T.grey_1)),
+              Text(
+                'Enter your credentials to continue',
+                style: T.bodyRegularBold.copyWith(color: T.grey_1),
+              ),
             ],
           ),
         ),
@@ -267,6 +334,7 @@ class _LoginScreenState extends State<LoginScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
+            // MAIN CONTENT
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -292,6 +360,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         key: _formKey,
                         child: Column(
                           children: [
+                            // EMAIL
                             SizedBox(
                               width: 305,
                               child: TextFormField(
@@ -329,6 +398,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 16.0),
+
+                            // PASSWORD
                             SizedBox(
                               width: 305,
                               child: TextFormField(
@@ -379,13 +450,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 8.0),
+
+                            // FORGOT PASSWORD
                             SizedBox(
                               width: 305,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   GestureDetector(
-                                    onTap: () {},
+                                    onTap: _showResetPasswordDialog,
                                     child: const Text(
                                       'Forgot Password?',
                                       style: TextStyle(
@@ -397,6 +470,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 20.0),
+
+                            // LOGIN BUTTON
                             SizedBox(
                               width: 315,
                               child: CustomButton(
@@ -411,7 +486,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 20.0),
 
-                            /// Row with Google & Apple sign-in
+                            // GOOGLE + APPLE SIGN-IN
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -465,6 +540,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             const SizedBox(height: 16.0),
+
+                            // TERMS / PRIVACY REMINDER
                             AnimatedOpacity(
                               opacity: isKeyboardOpen ? 0.0 : 1.0,
                               duration: const Duration(milliseconds: 180),
@@ -493,9 +570,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             print('Terms of Use clicked');
                                           },
                                       ),
-                                      const TextSpan(
-                                        text: ' and ',
-                                      ),
+                                      const TextSpan(text: ' and '),
                                       TextSpan(
                                         text: 'Privacy Policy',
                                         style: T.captionSmall.copyWith(
@@ -521,7 +596,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            /// Footer with "Register" prompt
+            // FOOTER
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),
