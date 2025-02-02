@@ -12,7 +12,20 @@
           "package_name": "com.example.smart_habit_tracker"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "913231085256-02rs9ko4amfuptkis6svlp7cc5fmkblk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smart_habit_tracker",
+            "certificate_hash": "8ca30a3bed53aef146c6d855e580da66bd694280"
+          }
+        },
+        {
+          "client_id": "913231085256-as8fqcgcoc3vbmcu3qrpe93tgha769h2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBT155edRCQhOc4Z_gN2A7_T7r_xaIQQs8"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "913231085256-as8fqcgcoc3vbmcu3qrpe93tgha769h2.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "913231085256-8ar9visjj3p4n16s9g0pshh8rj0749ql.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.smartHabitTracker"
+              }
+            }
+          ]
         }
       }
     }

@@ -1,11 +1,20 @@
+import 'dart:io' show Platform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:smart_habit_tracker/navigation/main_navigation.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
+
+// Firebase + Firestore
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Google Sign-In
+import 'package:google_sign_in/google_sign_in.dart';
+
+// Apple Sign-In
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class RegisterScreen extends StatefulWidget {
   final VoidCallback onToggle;
@@ -35,87 +44,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   TextEditingController confirmPasswordController = TextEditingController();
 
   final _formKey = GlobalKey<FormState>();
-
-  Future<void> registration() async {
-    if (_formKey.currentState!.validate()) {
-      // Update the email and password variables from the TextEditingController
-      email = emailController.text.trim();
-      password = passwordController.text.trim();
-
-      try {
-        UserCredential userCredential =
-            await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-
-        // Store user details in Firestore
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userCredential.user?.uid)
-            .set({
-          'name': nameController.text.trim(),
-          'email': emailController.text.trim(),
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        await userCredential.user
-            ?.updateProfile(displayName: nameController.text.trim());
-        await userCredential.user?.reload();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Registered Successfully',
-                style: TextStyle(fontSize: 20.0),
-              ),
-            ),
-          );
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MainNavigation(),
-            ),
-          );
-        }
-      } on FirebaseAuthException catch (e) {
-        String errorMessage = '';
-        if (e.code == 'weak-password') {
-          errorMessage = 'Password Provided is too Weak';
-        } else if (e.code == 'email-already-in-use') {
-          errorMessage = 'Account Already Exists';
-        } else {
-          errorMessage = 'An error occurred. Please try again.';
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: T.violet_1,
-              content: Text(
-                errorMessage,
-                style: const TextStyle(fontSize: 18.0),
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              backgroundColor: Colors.red,
-              content: Text(
-                'An unexpected error occurred.',
-                style: TextStyle(fontSize: 18.0),
-              ),
-            ),
-          );
-        }
-      }
-    }
-  }
 
   @override
   void initState() {
@@ -163,6 +91,210 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  /// Email/Password registration
+  Future<void> registration() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!isTermsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please accept the terms and conditions to proceed.',
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Create user with email/password
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      // Save user details in Firestore
+      final user = userCredential.user!;
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'name': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update displayName in Firebase Auth
+      await user.updateProfile(displayName: nameController.text.trim());
+      await user.reload();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Registered Successfully',
+            style: TextStyle(fontSize: 20.0),
+          ),
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+      );
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = '';
+      if (e.code == 'weak-password') {
+        errorMessage = 'Password Provided is too Weak';
+      } else if (e.code == 'email-already-in-use') {
+        errorMessage = 'Account Already Exists';
+      } else {
+        errorMessage = 'An error occurred. Please try again.';
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: T.violet_1,
+          content: Text(
+            errorMessage,
+            style: const TextStyle(fontSize: 18.0),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            'An unexpected error occurred.',
+            style: TextStyle(fontSize: 18.0),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Google Sign-Up (actually the same as signInWithGoogle: if user is new, account is created)
+  Future<void> signUpWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        // The user canceled the sign-in flow
+        return;
+      }
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Get the credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // If it's a new user, create a document in Firestore
+      if (userCredential.additionalUserInfo?.isNewUser == true) {
+        final user = userCredential.user!;
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Google Sign-Up Firebase error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(e.message ?? 'Google sign-up failed.'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Google Sign-Up general error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('An unexpected error occurred during Google sign-up.'),
+        ),
+      );
+    }
+  }
+
+  /// Apple Sign-Up (similar to signInWithApple)
+  Future<void> signUpWithApple() async {
+    if (!Platform.isIOS && !Platform.isMacOS) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Apple Sign-In is only supported on iOS/macOS.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        accessToken: appleCredential.authorizationCode,
+        idToken: appleCredential.identityToken,
+      );
+
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+
+      // If it's a new user, create a doc in Firestore
+      if (userCredential.additionalUserInfo?.isNewUser == true) {
+        final user = userCredential.user!;
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Apple Sign-Up Firebase error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(e.message ?? 'Apple sign-up failed.'),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Apple Sign-Up error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('An unexpected error occurred during Apple sign-up.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,15 +305,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Create your account',
-                style: T.h2,
-              ),
+              Text('Create your account', style: T.h2),
               const SizedBox(height: 4),
-              Text(
-                'Fill in your details to sign up',
-                style: T.bodyRegularBold.copyWith(color: T.grey_1),
-              ),
+              Text('Fill in your details to sign up',
+                  style: T.bodyRegularBold.copyWith(color: T.grey_1)),
             ],
           ),
         ),
@@ -189,8 +316,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
-
-      /// GestureDetector
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
@@ -460,24 +585,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             width: 315,
                             child: CustomButton(
                               text: 'Sign Up',
-                              onPressed: () {
-                                if (!_formKey.currentState!.validate()) {
-                                  return;
-                                }
-                                if (!isTermsAccepted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please accept the terms and conditions to proceed.',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                // Call the registration function
-                                registration();
-                              },
+                              onPressed: registration,
                               style: T.buttonStandard.copyWith(
                                 backgroundColor:
                                     WidgetStateProperty.all(T.violet_0),
@@ -490,107 +598,114 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Container(
-                                width: 150,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12.0,
-                                  horizontal: 16.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white30,
-                                  border: Border.all(
-                                    color: T.grey_0,
-                                    width: 1,
+                              GestureDetector(
+                                onTap: signUpWithGoogle,
+                                child: Container(
+                                  width: 150,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12.0,
+                                    horizontal: 16.0,
                                   ),
-                                  borderRadius: BorderRadius.circular(16.0),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.grey.withOpacity(0.1),
-                                      spreadRadius: 1,
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white30,
+                                    border: Border.all(
+                                      color: T.grey_0,
+                                      width: 1,
                                     ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Sign up',
-                                          style: T.bodyRegularBold
-                                              .copyWith(color: T.black_1),
-                                        ),
-                                        Text(
-                                          'with Google',
-                                          style: T.bodyRegular
-                                              .copyWith(color: T.grey_1),
-                                        ),
-                                      ],
-                                    ),
-                                    SvgPicture.asset(
-                                      'assets/icons/google-icon.svg',
-                                      width: 24,
-                                      height: 24,
-                                    ),
-                                  ],
+                                    borderRadius: BorderRadius.circular(16.0),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.1),
+                                        spreadRadius: 1,
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Sign up',
+                                            style: T.bodyRegularBold
+                                                .copyWith(color: T.black_1),
+                                          ),
+                                          Text(
+                                            'with Google',
+                                            style: T.bodyRegular
+                                                .copyWith(color: T.grey_1),
+                                          ),
+                                        ],
+                                      ),
+                                      SvgPicture.asset(
+                                        'assets/icons/google-icon.svg',
+                                        width: 24,
+                                        height: 24,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12.0),
-                              Container(
-                                width: 150,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12.0,
-                                  horizontal: 16.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white30,
-                                  border: Border.all(
-                                    color: T.grey_0,
-                                    width: 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(16.0),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.grey.withOpacity(0.1),
-                                      spreadRadius: 1,
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 3),
+                              if (Platform.isIOS || Platform.isMacOS)
+                                GestureDetector(
+                                  onTap: signUpWithApple,
+                                  child: Container(
+                                    width: 150,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12.0,
+                                      horizontal: 16.0,
                                     ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Sign up',
-                                          style: T.bodyRegularBold
-                                              .copyWith(color: T.black_1),
-                                        ),
-                                        Text(
-                                          'with Apple',
-                                          style: T.bodyRegular
-                                              .copyWith(color: T.grey_1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white30,
+                                      border: Border.all(
+                                        color: T.grey_0,
+                                        width: 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16.0),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.grey.withOpacity(0.1),
+                                          spreadRadius: 1,
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 3),
                                         ),
                                       ],
                                     ),
-                                    SvgPicture.asset(
-                                      'assets/icons/apple-icon.svg',
-                                      width: 24,
-                                      height: 24,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Sign up',
+                                              style: T.bodyRegularBold
+                                                  .copyWith(color: T.black_1),
+                                            ),
+                                            Text(
+                                              'with Apple',
+                                              style: T.bodyRegular
+                                                  .copyWith(color: T.grey_1),
+                                            ),
+                                          ],
+                                        ),
+                                        SvgPicture.asset(
+                                          'assets/icons/apple-icon.svg',
+                                          width: 24,
+                                          height: 24,
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 32.0),
@@ -601,6 +716,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
+
+            // Footer with "Log in" prompt
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),
