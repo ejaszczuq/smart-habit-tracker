@@ -5,9 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
-/// A widget that displays a scrollable calendar and a list of habits for the selected date.
-///
-/// Users can tap on a date to load and view corresponding habits, and toggle their completion.
 class CalendarWidget extends StatefulWidget {
   const CalendarWidget({super.key});
 
@@ -16,48 +13,29 @@ class CalendarWidget extends StatefulWidget {
 }
 
 class CalendarWidgetState extends State<CalendarWidget> {
-  /// The number of days before and after [DateTime.now()] to generate in [days].
   static const int daysOffset = 60;
-
-  /// A list of days used to render the horizontal date picker.
   late final List<DateTime> days;
-
-  /// The currently selected date from the horizontal calendar.
   late DateTime selectedDate;
-
-  /// Scroll controller to jump the list to "today".
   final ItemScrollController _scrollController = ItemScrollController();
-
-  /// Holds all habit documents for the current user.
   List<Map<String, dynamic>> habits = [];
-
-  /// Tracks completion status for each habit on each date.
-  ///
-  /// The structure is: `completionStatus[habitId]![yyyy-MM-dd] = true/false`.
   Map<String, Map<String, bool>> completionStatus = {};
+  int? activeDayIndex;
 
   @override
   void initState() {
     super.initState();
-    // Generate a list of dates from [now - daysOffset] to [now + daysOffset].
     days = List.generate(
       2 * daysOffset,
       (index) => DateTime.now().add(Duration(days: index - daysOffset)),
     );
     selectedDate = DateTime.now();
+    activeDayIndex = days.indexWhere((d) => _isSameDay(d, DateTime.now()));
     _loadUserHabits();
   }
 
-  // ---------------------------------------------------------------------------
-  // 1) FIRESTORE LOADS
-  // ---------------------------------------------------------------------------
-
-  /// Fetches all habits for the current user from Firestore and loads
-  /// their completion status for the [selectedDate].
   Future<void> _loadUserHabits() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     try {
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
@@ -76,23 +54,18 @@ class CalendarWidgetState extends State<CalendarWidget> {
         habits = fetchedHabits;
       });
 
-      // Load completion status for the currently selected date
       await _loadCompletionStatusForDate(selectedDate);
     } catch (e) {
       debugPrint('Error fetching habits: $e');
     }
   }
 
-  /// Loads completion status of all [habits] on a specific [date].
-  /// Also initializes the period completions in Firestore if missing (for type=4).
   Future<void> _loadCompletionStatusForDate(DateTime date) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     try {
       final formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
-      // For each habit, check if it's marked completed on [formattedDate].
       for (var habit in habits) {
         final completionSnapshot = await FirebaseFirestore.instance
             .collection('users')
@@ -111,8 +84,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
         });
       }
 
-      // Ensure the period key is initialized for "X times in a period" habits (type=4).
-      final periodKey = _getCurrentPeriodKey(date, 'Week'); // Example: 'Week'
+      final periodKey = _getCurrentPeriodKey(date, 'Week');
       for (var habit in habits) {
         final habitRef = FirebaseFirestore.instance
             .collection('users')
@@ -127,7 +99,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
         final frequency = habitData['frequency'];
         if (frequency == null || frequency['type'] != 4) continue;
 
-        // If the period doesn't yet exist in Firestore, initialize it to 0.
         if (!frequency.containsKey('completions') ||
             !frequency['completions'].containsKey(periodKey)) {
           await habitRef.update({
@@ -140,12 +111,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 2) HABIT TOGGLING (Optimistic UI) + Local Period Update
-  // ---------------------------------------------------------------------------
-
-  /// Toggles the completion status of a habit for [date], updating the UI immediately
-  /// (optimistic), then writing to Firestore in the background.
   Future<void> _toggleHabitCompletion(
     String habitId,
     DateTime date,
@@ -153,7 +118,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
   ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     final formattedDate = DateFormat('yyyy-MM-dd').format(date);
     final habitRef = FirebaseFirestore.instance
         .collection('users')
@@ -161,24 +125,20 @@ class CalendarWidgetState extends State<CalendarWidget> {
         .collection('habits')
         .doc(habitId);
 
-    // 1. "Optimistic" local update of completionStatus
     setState(() {
       completionStatus[habitId] ??= {};
       completionStatus[habitId]![formattedDate] = isCompleted;
     });
 
     try {
-      // 2. Firestore update in the background
       final habitSnapshot = await habitRef.get();
       final habitData = habitSnapshot.data();
       if (habitData == null) return;
 
       final frequency = habitData['frequency'];
-      // Only do period-based logic for type=4
       if (frequency != null && frequency['type'] == 4) {
         final period = frequency['periodType'] ?? 'Week';
         final periodKey = _getCurrentPeriodKey(date, period);
-
         if (isCompleted) {
           await habitRef
               .collection('completion')
@@ -187,20 +147,15 @@ class CalendarWidgetState extends State<CalendarWidget> {
           await habitRef.update({
             'frequency.completions.$periodKey': FieldValue.increment(1),
           });
-
-          // !!CHANGED!! - Also update the local period count so it matches Firestore
           _updateLocalPeriodCount(habitId, periodKey, 1);
         } else {
           await habitRef.collection('completion').doc(formattedDate).delete();
           await habitRef.update({
             'frequency.completions.$periodKey': FieldValue.increment(-1),
           });
-
-          // !!CHANGED!! - Decrement local period count
           _updateLocalPeriodCount(habitId, periodKey, -1);
         }
       } else {
-        // If not type=4, handle differently or just do a simple set/delete
         if (isCompleted) {
           await habitRef
               .collection('completion')
@@ -210,41 +165,25 @@ class CalendarWidgetState extends State<CalendarWidget> {
           await habitRef.collection('completion').doc(formattedDate).delete();
         }
       }
-
-      // 3. We skip reloading completions so the UI is snappy.
     } catch (e) {
       debugPrint('Error toggling habit completion: $e');
-
-      // 4. Revert local state if the write fails
       setState(() {
         completionStatus[habitId]?[formattedDate] = !isCompleted;
       });
     }
   }
 
-  /// !!CHANGED!! A helper method to update the local "completions" count
-  /// inside [habits], so `_shouldDisplayHabit` logic instantly sees changes.
   void _updateLocalPeriodCount(String habitId, String periodKey, int delta) {
-    // Find the habit in the local `habits` list
     final index = habits.indexWhere((h) => h['id'] == habitId);
     if (index == -1) return;
-
     final habit = habits[index];
     final freq = habit['frequency'];
     if (freq == null) return;
-
-    // The "completions" map inside frequency
     final completions = (freq['completions'] ?? {}) as Map<String, dynamic>;
-
     final oldCount = completions[periodKey] ?? 0;
     final newCount = oldCount + delta;
-
-    // Make sure we don't go negative
     completions[periodKey] = newCount < 0 ? 0 : newCount;
-
-    // Re-assign it back
     freq['completions'] = completions;
-
     setState(() {
       habits[index] = {
         ...habit,
@@ -253,15 +192,9 @@ class CalendarWidgetState extends State<CalendarWidget> {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // 3) HABIT DELETION
-  // ---------------------------------------------------------------------------
-
-  /// Deletes a habit with the given [habitId] from Firestore and from local state.
   Future<void> _deleteHabit(String habitId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     try {
       await FirebaseFirestore.instance
           .collection('users')
@@ -269,12 +202,10 @@ class CalendarWidgetState extends State<CalendarWidget> {
           .collection('habits')
           .doc(habitId)
           .delete();
-
       setState(() {
         habits.removeWhere((habit) => habit['id'] == habitId);
         completionStatus.remove(habitId);
       });
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Habit deleted successfully.')),
       );
@@ -286,7 +217,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
-  /// Shows a confirmation dialog before deleting a habit.
   void _showDeleteDialog(String habitId) {
     showDialog(
       context: context,
@@ -312,11 +242,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 4) HELPER METHODS
-  // ---------------------------------------------------------------------------
-
-  /// Returns a list of habits that should be displayed on the given [date].
   List<Map<String, dynamic>> _getHabitsForSelectedDate(DateTime date) {
     return habits.where((habit) {
       final frequency = habit['frequency'];
@@ -324,78 +249,54 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }).toList();
   }
 
-  /// Determines if a [habit] should be displayed on the given [date],
-  /// based on the habit's [frequency] rules.
   bool _shouldDisplayHabit(
     Map<String, dynamic> habit,
     Map<String, dynamic>? frequency,
     DateTime date,
   ) {
     if (frequency == null) return false;
-
     final type = frequency['type'];
     switch (type) {
-      case 0: // Every day
+      case 0:
         return true;
-
-      case 1: // Specific days of the week
+      case 1:
         final daysOfWeek = frequency['daysOfWeek'] as List<dynamic>? ?? [];
         final weekday = DateFormat('EEE').format(date);
         return daysOfWeek.contains(weekday);
-
-      case 2: // Specific days of the month
+      case 2:
         final daysOfMonth = frequency['daysOfMonth'] as List<dynamic>? ?? [];
         return daysOfMonth.contains(date.day);
-
-      case 3: // Specific days of the year
+      case 3:
         final specificDates =
             frequency['specificDates'] as List<dynamic>? ?? [];
         final formattedDate = DateFormat('MMMM d').format(date);
         return specificDates.contains(formattedDate);
-
-      case 4: // Show X times in a week/month/year
+      case 4:
         final period = frequency['periodType'] ?? 'Week';
         final maxOccurrences = frequency['daysPerPeriod'] ?? 1;
-
-        // Identify which "period" the given date belongs to.
         final currentPeriodKey = _getCurrentPeriodKey(date, period);
-
-        // Get how many total completions we have so far in that period.
         final completions = frequency['completions'] ?? {};
         final currentCompletions = completions[currentPeriodKey] ?? 0;
-
-        // Check if this specific date is marked as completed.
         final dateKey = DateFormat('yyyy-MM-dd').format(date);
         final isDayCompleted = completionStatus[habit['id']]?[dateKey] ?? false;
-
-        // 1. If this day is already completed, always show it.
         if (isDayCompleted) return true;
-
-        // 2. If not completed and total completions < maxOccurrences, show it.
         if (currentCompletions < maxOccurrences) {
           return true;
         }
-
-        // 3. Otherwise, hide it.
         return false;
-
-      case 5: // Repeat every X days
+      case 5:
         final startDateRaw = frequency['startDate'] ?? habit['createdAt'];
         if (startDateRaw == null) return false;
-
         final startDate = _parseDate(startDateRaw);
         if (startDate == null) return false;
-
         final interval = frequency['interval'] as int? ?? 1;
         return !date.isBefore(startDate) &&
             date.difference(startDate).inDays % interval == 0;
-
       default:
         return false;
     }
   }
 
-  /// Parses a date from either a Firestore [Timestamp] or a [String] (ISO format).
   DateTime? _parseDate(dynamic rawDate) {
     if (rawDate is Timestamp) {
       return rawDate.toDate();
@@ -405,11 +306,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
     return null;
   }
 
-  /// Returns a string key representing the "period" (week, month, year) for [date].
-  ///
-  /// - For 'Week', it returns "YYYY-WXX" using a custom ISO week calculation.
-  /// - For 'Month', it returns "YYYY-MM".
-  /// - For 'Year', it returns "YYYY".
   String _getCurrentPeriodKey(DateTime date, String period) {
     switch (period) {
       case 'Week':
@@ -420,36 +316,23 @@ class CalendarWidgetState extends State<CalendarWidget> {
       case 'Year':
         return DateFormat('yyyy').format(date);
       default:
-        // daily fallback
         return DateFormat('yyyy-MM-dd').format(date);
     }
   }
 
-  /// Calculates the ISO week number for [date].
-  ///
-  /// ISO weeks start on Monday, and Week 1 is the week containing the first Thursday of the year.
   int _getIsoWeekNumber(DateTime date) {
-    // Day of year (1..366)
     final dayOfYear = int.parse(DateFormat('D').format(date));
-
-    // date.weekday: Monday=1, Tuesday=2, ... Sunday=7
-    // Formula for approximate ISO week:
     final woy = ((dayOfYear - date.weekday + 10) / 7).floor();
-
     if (woy < 1) {
-      // belongs to last week of the previous year
       return _getIsoWeekNumber(DateTime(date.year - 1, 12, 31));
     } else if (woy > _isoWeeksInYear(date.year)) {
-      // belongs to first week of the next year
       return 1;
     } else {
       return woy;
     }
   }
 
-  /// Returns how many ISO weeks are in [year] (usually 52 or 53).
   int _isoWeeksInYear(int year) {
-    // Basic formula to figure out if the year might have 53 ISO weeks.
     final p = (year +
             (year / 4).floor() -
             (year / 100).floor() +
@@ -458,12 +341,10 @@ class CalendarWidgetState extends State<CalendarWidget> {
     return (p == 4 || p == 3) ? 53 : 52;
   }
 
-  /// Checks if two [DateTime] objects share the same calendar day (year, month, day).
   bool _isSameDay(DateTime d1, DateTime d2) {
     return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
   }
 
-  /// Returns an [IconData] from a given [label], e.g. "Running" -> Icons.run_circle.
   IconData _iconFromLabel(String? label) {
     switch (label) {
       case 'Running':
@@ -481,7 +362,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
-  /// Returns a [Color] from a given [label], e.g. "Violet" -> Colors.purple.
   Color _colorFromLabel(String? label) {
     switch (label) {
       case 'Red':
@@ -501,21 +381,15 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 5) UI BUILD
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     final todayIndex =
         days.indexWhere((date) => _isSameDay(date, DateTime.now()));
     final habitsForDate = _getHabitsForSelectedDate(selectedDate);
-
     return Column(
       children: [
-        /// Horizontal Calendar
         SizedBox(
-          height: 68, // Matches Figma height
+          height: 80,
           child: ScrollablePositionedList.builder(
             itemScrollController: _scrollController,
             initialScrollIndex: todayIndex >= 0 ? todayIndex : 0,
@@ -526,68 +400,94 @@ class CalendarWidgetState extends State<CalendarWidget> {
               final isToday = _isSameDay(day, DateTime.now());
               final dayOfMonth = DateFormat('d').format(day);
               final dayOfWeek = DateFormat('EEE').format(day);
+              final isActive = activeDayIndex == index;
 
-              return GestureDetector(
-                onTap: () async {
-                  // Immediately switch the selected date (rebuild UI).
-                  setState(() {
-                    selectedDate = day;
-                  });
-                  // Optionally fetch completion info for that day (if not pre-fetched).
-                  await _loadCompletionStatusForDate(day);
-                },
-                child: Container(
-                  width: 48,
-                  height: 68,
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: 4), // Space between cards
-                  decoration: BoxDecoration(
-                    color: T.white_0,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isToday ? T.violet_0 : T.grey_2,
-                      width: 2,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize
-                        .min, // Ensures the column takes only the required space
-                    children: [
-                      Transform.translate(
-                        offset: const Offset(0, 4),
-                        child: Text(dayOfMonth, style: T.calendarNumbers),
-                      ),
-                      Transform.translate(
-                        offset: const Offset(0, -1),
-                        child: Text(
-                          dayOfWeek.toUpperCase(),
-                          style: T.captionSmallBold
-                              .copyWith(color: isToday ? T.violet_0 : T.grey_1),
+              final scaleFactor = isActive ? 1.1 : 1.0;
+              return SizedBox(
+                width: 60,
+                height: 80,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedDate = day;
+                      activeDayIndex = index;
+                    });
+                    _loadCompletionStatusForDate(day);
+                  },
+                  child: TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 300),
+                    tween: Tween<double>(begin: 1.0, end: scaleFactor),
+                    builder: (context, scale, child) {
+                      return Transform.scale(
+                        scale: scale,
+                        child: Center(
+                          child: Container(
+                            width: 48,
+                            height: 68,
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            decoration: BoxDecoration(
+                              gradient: isActive
+                                  ? const LinearGradient(
+                                      colors: [T.violet_0, T.purple_1],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color:
+                                  isActive ? null : T.white_0.withOpacity(0.95),
+                              borderRadius: BorderRadius.circular(15),
+                              boxShadow: isActive
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                  : [],
+                              border: Border.all(
+                                color: isToday ? T.violet_0 : T.grey_2,
+                                width: 2,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  dayOfMonth,
+                                  style: T.calendarNumbers.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isActive ? Colors.white : T.violet_0,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  dayOfWeek.toUpperCase(),
+                                  style: T.captionSmallBold.copyWith(
+                                    color: isActive ? Colors.white70 : T.grey_1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               );
             },
           ),
         ),
-
         const SizedBox(height: 20),
-
-        /// Header for selected date
         Text(
           'Habits for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}',
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
         ),
-
         const SizedBox(height: 10),
-
-        /// Habits List
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async {
-              // Reload all habits, then re-check completion statuses.
               await _loadUserHabits();
               await _loadCompletionStatusForDate(selectedDate);
             },
@@ -598,35 +498,92 @@ class CalendarWidgetState extends State<CalendarWidget> {
                 final habitId = habit['id'];
                 final completionDate =
                     DateFormat('yyyy-MM-dd').format(selectedDate);
-
-                // Check local completion status
                 final isCompleted =
                     completionStatus[habitId]?[completionDate] ?? false;
+                final habitColor = _colorFromLabel(habit['color'] as String?);
 
                 return GestureDetector(
                   onLongPress: () => _showDeleteDialog(habitId),
-                  child: Card(
-                    margin:
-                        const EdgeInsets.symmetric(vertical: 5, horizontal: 15),
-                    child: ListTile(
-                      leading: Icon(
-                        _iconFromLabel(habit['icon'] as String?),
-                        color: _colorFromLabel(habit['color'] as String?),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 25, vertical: 6),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: isCompleted
+                            ? LinearGradient(
+                                colors: [
+                                  habitColor.withOpacity(0.3),
+                                  habitColor.withOpacity(0.1),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        color: isCompleted ? null : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                        border: Border.all(
+                            color: habitColor.withOpacity(0.5), width: 1),
                       ),
-                      title: Text(habit['name'] ?? 'No Name'),
-                      subtitle: Text(habit['description'] ?? 'No Description'),
-                      tileColor: _colorFromLabel(habit['color'] as String?)
-                          .withOpacity(0.1),
-                      trailing: Checkbox(
-                        value: isCompleted,
-                        onChanged: (value) {
-                          // "value" is bool? => default to false if null
-                          _toggleHabitCompletion(
-                            habitId,
-                            selectedDate,
-                            value ?? false,
-                          );
-                        },
+                      child: ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: habitColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              _iconFromLabel(habit['icon'] as String?),
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          habit['name'] ?? 'No Name',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: T.black_0,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          habit['description'] ?? 'No Description',
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: isCompleted
+                              ? Icon(
+                                  Icons.check_box_outlined,
+                                  color: habitColor,
+                                  size: 24,
+                                )
+                              : const Icon(
+                                  Icons.check_box_outline_blank_outlined,
+                                  color: Colors.grey,
+                                  size: 24,
+                                ),
+                          onPressed: () {
+                            _toggleHabitCompletion(
+                              habitId,
+                              selectedDate,
+                              !isCompleted,
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String currentDate = DateFormat('EEE., d.MM.yy').format(DateTime.now());
     return Scaffold(
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(120),
+        preferredSize: const Size.fromHeight(100),
         child: AppBar(
           automaticallyImplyLeading: false,
           elevation: 0,
@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 5),
               ],
             ),
           ),
@@ -92,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: const Column(
         children: [
-          SizedBox(height: 10),
+          SizedBox(height: 7),
           Expanded(
             child: CalendarWidget(),
           ),
