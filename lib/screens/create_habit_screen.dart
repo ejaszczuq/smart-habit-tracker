@@ -21,7 +21,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   String selectedIconLabel = 'Running';
   String selectedColorLabel = 'Violet';
   IconData? selectedIcon;
-  Color? selectedColor = Colors.purple;
+  Color? selectedColor = T.violet_2;
   String _evaluationMethod = '';
   int? selectedIndex;
   final Set<String> _selectedDaysOfWeek = {};
@@ -165,10 +165,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
 
     final List<Map<String, dynamic>> colors = [
       {'color': Colors.red, 'label': 'Red'},
-      {'color': Colors.blue, 'label': 'Blue'},
+      {'color': T.blue_0, 'label': 'Blue'},
       {'color': Colors.green, 'label': 'Green'},
       {'color': Colors.orange, 'label': 'Orange'},
-      {'color': Colors.purple, 'label': 'Violet'},
+      {'color': T.purple_0, 'label': 'Purple'},
+      {'color': T.violet_2, 'label': 'Violet'}
     ];
 
     void openIconPicker(BuildContext context) {
