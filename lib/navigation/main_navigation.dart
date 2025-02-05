@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/screens/create_habit_screen.dart';
+import 'package:smart_habit_tracker/screens/habits_screen.dart';
 import 'package:smart_habit_tracker/screens/home_screen.dart';
 import 'package:smart_habit_tracker/screens/profile_screen.dart';
 import 'package:smart_habit_tracker/widgets/bottom_nav_bar.dart';
@@ -16,12 +17,13 @@ class MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _screens = [
     const HomeScreen(),
+    const HabitsScreen(),
     const CreateHabitScreen(),
     const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
-    if (index == 1) {
+    if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const CreateHabitScreen()),

@@ -10,12 +10,22 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      // Upewnij się, że typ jest fixed
       currentIndex: currentIndex,
       onTap: onTap,
+      selectedItemColor: Colors.grey,
+      unselectedItemColor: Colors.grey,
+      selectedLabelStyle: const TextStyle(color: Colors.grey),
+      unselectedLabelStyle: const TextStyle(color: Colors.grey),
       items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.home_filled),
           label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.check_circle),
+          label: 'Habits',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.add),
