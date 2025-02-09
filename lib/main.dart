@@ -20,6 +20,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Smart Habit Tracker',
       theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: T.violet_0),
+        useMaterial3: true,
         scaffoldBackgroundColor: T.white_1,
         textTheme: GoogleFonts.alegreyaTextTheme(),
         appBarTheme: const AppBarTheme(
