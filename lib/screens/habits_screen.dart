@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../widgets/habit_mini_calendar.dart';
-import 'habit_statistics_screen.dart'; // Import statistics screen
+import 'habit_statistics_screen.dart';
 
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
@@ -13,32 +12,31 @@ class HabitsScreen extends StatefulWidget {
 }
 
 class HabitsScreenState extends State<HabitsScreen> {
-  // The selected date is used to compute the current week for each habit's mini calendar.
   DateTime selectedDate = DateTime.now();
 
-  /// Returns a list of 7 days for the current week (non-scrollable)
+  /// Returns a list of 7 dates (the current week) based on selectedDate
   List<DateTime> getWeekDates() {
-    int weekday = selectedDate.weekday; // 1 = Monday, 7 = Sunday
+    int weekday = selectedDate.weekday; // 1=Mon, 7=Sun
     DateTime monday = selectedDate.subtract(Duration(days: weekday - 1));
     return List.generate(7, (index) => monday.add(Duration(days: index)));
   }
 
-  /// Fetches the habits for the current user from Firestore.
   Future<List<Map<String, dynamic>>> fetchHabits() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
+
     final querySnapshot = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('habits')
         .get();
-    final habits = querySnapshot.docs.map((doc) {
+
+    return querySnapshot.docs.map((doc) {
       return {
         ...doc.data(),
         'id': doc.id,
       };
     }).toList();
-    return habits;
   }
 
   @override
@@ -47,10 +45,16 @@ class HabitsScreenState extends State<HabitsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Habits Overview'),
+        actions: [
+          // Gear icon in the top-right corner
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => _showSettingsDialog(),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        // Global weekly header removed.
         child: Column(
           children: [
             Expanded(
@@ -60,11 +64,15 @@ class HabitsScreenState extends State<HabitsScreen> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
                   } else {
                     final habits = snapshot.data ?? [];
                     if (habits.isEmpty) {
-                      return const Center(child: Text('No habits found.'));
+                      return const Center(
+                        child: Text('No habits found.'),
+                      );
                     }
                     return ListView.builder(
                       itemCount: habits.length,
@@ -78,29 +86,13 @@ class HabitsScreenState extends State<HabitsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: habit['color'] != null
-                                        ? _colorFromLabel(habit['color'])
-                                        : Colors.grey,
-                                    child: Icon(
-                                      _iconFromLabel(habit['icon']),
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                                  leading: const Icon(Icons.check_circle),
                                   title: Text(habit['name'] ?? 'No Name'),
                                   subtitle: Text(
                                       habit['description'] ?? 'No Description'),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // Calendar icon button (if needed)
-                                      IconButton(
-                                        icon: const Icon(Icons.calendar_today),
-                                        onPressed: () {
-                                          // TODO: Add logic for calendar button
-                                        },
-                                      ),
-                                      // Statistics icon button: navigate to statistics screen.
                                       IconButton(
                                         icon: const Icon(Icons.bar_chart),
                                         onPressed: () {
@@ -114,17 +106,15 @@ class HabitsScreenState extends State<HabitsScreen> {
                                           );
                                         },
                                       ),
-                                      // More options (three horizontal dots)
                                       IconButton(
                                         icon: const Icon(Icons.more_horiz),
                                         onPressed: () {
-                                          // TODO: Add logic for more options (context menu)
+                                          // TODO: Add more options if needed
                                         },
                                       ),
                                     ],
                                   ),
                                 ),
-                                // Mini calendar preview for this habit.
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 16.0),
@@ -149,43 +139,41 @@ class HabitsScreenState extends State<HabitsScreen> {
     );
   }
 
-  /// Helper function to map an icon label (stored in Firestore) to IconData.
-  IconData _iconFromLabel(dynamic label) {
-    switch (label) {
-      case 'Running':
-        return Icons.run_circle;
-      case 'Walking':
-        return Icons.directions_walk;
-      case 'Fitness':
-        return Icons.fitness_center;
-      case 'Sports':
-        return Icons.sports;
-      case 'Cycling':
-        return Icons.directions_bike_sharp;
-      case 'Reading':
-        return Icons.menu_book;
-      case 'Meditation':
-        return Icons.self_improvement;
-      default:
-        return Icons.help;
-    }
-  }
+  /// Displays a simple dialog with "Logout" button. The logout logic
+  /// is the same as in ProfileScreen: we call signOut from FirebaseAuth.
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Settings'),
+          content: const Text('Choose an action:'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx); // close dialog
+                await FirebaseAuth.instance.signOut();
 
-  /// Helper function to map a color label (stored in Firestore) to a Color.
-  Color _colorFromLabel(dynamic label) {
-    switch (label) {
-      case 'Red':
-        return Colors.red;
-      case 'Blue':
-        return Colors.blue;
-      case 'Green':
-        return Colors.green;
-      case 'Orange':
-        return Colors.orange;
-      case 'Violet':
-        return Colors.purple;
-      default:
-        return Colors.grey;
-    }
+                // After signOut, navigate back to the Auth router or main
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Logged out successfully')),
+                );
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/', // or your main route
+                      (route) => false,
+                );
+              },
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

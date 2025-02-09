@@ -21,6 +21,7 @@ class BottomNavBar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.topCenter,
         children: [
+          // Navigation background
           Positioned(
             bottom: 0,
             left: 0,
@@ -38,6 +39,7 @@ class BottomNavBar extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
+                  // LEFT ICON => Index 0 (Home)
                   GestureDetector(
                     onTap: () => onTap(0),
                     child: Column(
@@ -58,7 +60,11 @@ class BottomNavBar extends StatelessWidget {
                       ],
                     ),
                   ),
+
+                  // Spacer for the center button
                   const SizedBox(width: centerButtonSize),
+
+                  // RIGHT ICON => Index 2 (Profile - Habits)
                   GestureDetector(
                     onTap: () => onTap(2),
                     child: Column(
@@ -83,6 +89,8 @@ class BottomNavBar extends StatelessWidget {
               ),
             ),
           ),
+
+          // CENTER BUTTON => Index 1 (Add Habit)
           Positioned(
             top: 10,
             child: GestureDetector(
@@ -97,7 +105,6 @@ class BottomNavBar extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  boxShadow: const [],
                   border: Border.all(color: Colors.white, width: 6),
                 ),
                 child: const Center(
