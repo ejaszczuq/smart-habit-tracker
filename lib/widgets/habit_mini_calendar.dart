@@ -8,16 +8,17 @@ class HabitMiniCalendar extends StatelessWidget {
   final List<DateTime> weekDates;
 
   const HabitMiniCalendar({
-    Key? key,
+    super.key,
     required this.habit,
     required this.weekDates,
-  }) : super(key: key);
+  });
 
-  /// Listens to changes in the habit’s completions and returns a stream mapping
-  /// date strings (formatted as "yyyy-MM-dd") to a Boolean indicating completion.
+  /// Subscribes to completions in Firestore and interprets them all as doc.data()['completed'] = true/false.
+  /// No special logic for checklists. We treat them identically to yes/no.
   Stream<Map<String, bool>> watchCompletionStatus() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return Stream.value({});
+
     final habitId = habit['id'] as String;
     return FirebaseFirestore.instance
         .collection('users')
@@ -27,85 +28,17 @@ class HabitMiniCalendar extends StatelessWidget {
         .collection('completion')
         .snapshots()
         .map((snapshot) {
-      Map<String, bool> completions = {};
+      final completions = <String, bool>{};
       for (var doc in snapshot.docs) {
-        final docId = doc.id;
-        bool completed = false;
         if (doc.exists) {
-          if (habit['evaluationMethod'] == 'Checklist') {
-            List<dynamic> subTasks = habit['subTasks'] ?? [];
-            List<dynamic> doneTasks = doc.data()['checklist'] ?? [];
-            completed =
-                subTasks.isNotEmpty && (doneTasks.length == subTasks.length);
-          } else {
-            completed = doc.data()['completed'] ?? false;
-          }
+          final docId = doc.id; // "yyyy-MM-dd"
+          final data = doc.data();
+          final isCompleted = data['completed'] ?? false;
+          completions[docId] = isCompleted;
         }
-        completions[docId] = completed;
       }
       return completions;
     });
-  }
-
-  int _isoWeekNumber(DateTime date) {
-    final dayOfYear = int.parse(DateFormat("D").format(date));
-    final woy = ((dayOfYear - date.weekday + 10) / 7).floor();
-    if (woy < 1) {
-      return _isoWeekNumber(DateTime(date.year - 1, 12, 31));
-    } else if (woy > _weeksInYear(date.year)) {
-      return 1;
-    } else {
-      return woy;
-    }
-  }
-
-  int _weeksInYear(int year) {
-    final p = (year + (year ~/ 4) - (year ~/ 100) + (year ~/ 400)) % 7;
-    return (p == 4 || p == 3) ? 53 : 52;
-  }
-
-  /// For frequency types 0,1,2,3,5 the function uses standard scheduling.
-  /// (Frequency type 4 is handled separately in the code below.)
-  bool isScheduled(DateTime day) {
-    final frequency = habit['frequency'] as Map<String, dynamic>?;
-    if (frequency == null) return false;
-    final type = frequency['type'] as int? ?? 0;
-    switch (type) {
-      case 0: // Every day
-        return true;
-      case 1: // Specific days of the week
-        final daysOfWeek =
-            (frequency['daysOfWeek'] as List<dynamic>?)?.cast<String>() ?? [];
-        String dayLabel = DateFormat('EEE').format(day);
-        return daysOfWeek.contains(dayLabel);
-      case 2: // Specific days of the month
-        final daysOfMonth =
-            (frequency['daysOfMonth'] as List<dynamic>?)?.cast<int>() ?? [];
-        return daysOfMonth.contains(day.day);
-      case 3: // Specific days of the year
-        final specificDates =
-            (frequency['specificDates'] as List<dynamic>?)?.cast<String>() ??
-                [];
-        String formatted = DateFormat('MMMM d').format(day);
-        return specificDates.contains(formatted);
-      case 5: // Repeat every X days
-        {
-          final startDateRaw = frequency['startDate'];
-          if (startDateRaw == null) return false;
-          DateTime? startDate;
-          if (startDateRaw is String) {
-            startDate = DateTime.tryParse(startDateRaw);
-          } else if (startDateRaw is Timestamp) {
-            startDate = startDateRaw.toDate();
-          }
-          if (startDate == null) return false;
-          final interval = frequency['interval'] as int? ?? 1;
-          if (day.isBefore(startDate)) return false;
-          return (day.difference(startDate).inDays % interval == 0);
-        }
-      default:
-        return false;
-    }
   }
 
   @override
@@ -113,71 +46,76 @@ class HabitMiniCalendar extends StatelessWidget {
     return StreamBuilder<Map<String, bool>>(
       stream: watchCompletionStatus(),
       builder: (context, snapshot) {
-        Map<String, bool> completions = {};
-        if (snapshot.hasData) {
-          completions = snapshot.data!;
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
         }
 
-        Map<String, int> dayStates = {};
+        final completions = snapshot.data!;
         final frequency = habit['frequency'] as Map<String, dynamic>? ?? {};
-        int freqType = frequency['type'] as int? ?? 0;
+        final freqType = frequency['type'] as int? ?? 0;
+
+        // We'll store day -> 0 (empty), 1 (scheduled), 2 (completed)
+        final dayStates = <String, int>{};
 
         if (freqType == 4) {
-          // Frequency type 4 ("X times per period") – tasks can be done on any day in the period.
-          // We mark as "completed" (state 2) the days with a recorded completion.
-          // For days that are today or in the future, if the number of completions is still less than allowed,
-          // we mark them as "scheduled" (state 1). Past days (without completion) remain unmarked (state 0).
-          int allowed = frequency['daysPerPeriod'] as int? ?? 1;
+          // type=4 => "X times per period"
+          final allowed = frequency['daysPerPeriod'] as int? ?? 1;
           int currentCount = 0;
-          // First count the number of completions in weekDates.
+
+          // Count how many are already completed in this 7-day window.
           for (final day in weekDates) {
-            final formattedDate = DateFormat('yyyy-MM-dd').format(day);
-            if (completions[formattedDate] ?? false) {
+            final dateKey = DateFormat('yyyy-MM-dd').format(day);
+            if (completions[dateKey] == true) {
               currentCount++;
             }
           }
-          DateTime today = DateTime.now();
-          DateTime todayDate = DateTime(today.year, today.month, today.day);
+
+          // Determine future or past
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
 
           for (final day in weekDates) {
-            final formattedDate = DateFormat('yyyy-MM-dd').format(day);
-            if (completions[formattedDate] ?? false) {
-              dayStates[formattedDate] = 2; // Completed
+            final dateKey = DateFormat('yyyy-MM-dd').format(day);
+            if (completions[dateKey] == true) {
+              dayStates[dateKey] = 2; // completed
             } else {
-              // For past days, do not mark as scheduled.
-              if (day.isBefore(todayDate)) {
-                dayStates[formattedDate] = 0;
+              if (day.isBefore(today)) {
+                // Past day and not completed
+                dayStates[dateKey] = 0;
               } else {
-                // For today or future days, mark as scheduled if allowed count not yet reached.
+                // Today or future day
                 if (currentCount < allowed) {
-                  dayStates[formattedDate] = 1;
-                  currentCount++; // Count the scheduled day as if it were completed for display purposes.
+                  dayStates[dateKey] = 1; // scheduled
+                  currentCount++;
                 } else {
-                  dayStates[formattedDate] = 0;
+                  dayStates[dateKey] = 0; // no more slots
                 }
               }
             }
           }
         } else {
-          // For other frequency types, use the standard logic.
+          // Other frequency types
           for (final day in weekDates) {
-            final formattedDate = DateFormat('yyyy-MM-dd').format(day);
-            if (completions[formattedDate] ?? false) {
-              dayStates[formattedDate] = 2;
-            } else if (isScheduled(day)) {
-              dayStates[formattedDate] = 1;
+            final dateKey = DateFormat('yyyy-MM-dd').format(day);
+            final isDone = completions[dateKey] == true;
+
+            if (isDone) {
+              dayStates[dateKey] = 2;
+            } else if (_isScheduled(day)) {
+              dayStates[dateKey] = 1;
             } else {
-              dayStates[formattedDate] = 0;
+              dayStates[dateKey] = 0;
             }
           }
         }
 
+        // Render mini calendar
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: weekDates.map((day) {
-            final formattedDate = DateFormat('yyyy-MM-dd').format(day);
-            int state = dayStates[formattedDate] ?? 0;
-            // Define colors: subtle green for completed, subtle yellow for scheduled, light grey otherwise.
+            final dateKey = DateFormat('yyyy-MM-dd').format(day);
+            final state = dayStates[dateKey] ?? 0;
+
             Color circleColor;
             if (state == 2) {
               circleColor = Colors.green.withOpacity(0.5);
@@ -186,6 +124,7 @@ class HabitMiniCalendar extends StatelessWidget {
             } else {
               circleColor = Colors.grey[300]!;
             }
+
             return Column(
               children: [
                 Text(
@@ -205,7 +144,9 @@ class HabitMiniCalendar extends StatelessWidget {
                     color: circleColor,
                     shape: BoxShape.circle,
                     border: Border.all(
-                        color: Colors.grey.withOpacity(0.5), width: 1),
+                      color: Colors.grey.withOpacity(0.5),
+                      width: 1,
+                    ),
                   ),
                   child: Text(
                     day.day.toString(),
@@ -221,5 +162,54 @@ class HabitMiniCalendar extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Checks if habit is "scheduled" on [day], ignoring completion.
+  bool _isScheduled(DateTime day) {
+    final frequency = habit['frequency'] as Map<String, dynamic>? ?? {};
+    final type = frequency['type'] as int? ?? 0;
+
+    switch (type) {
+      case 0: // every day
+        return true;
+      case 1: // specific days of the week
+        final daysOfWeek = (frequency['daysOfWeek'] as List<dynamic>?) ?? [];
+        final dayLabel = DateFormat('EEE').format(day);
+        return daysOfWeek.contains(dayLabel);
+
+      case 2: // specific days of the month
+        final daysOfMonth = (frequency['daysOfMonth'] as List<dynamic>?) ?? [];
+        return daysOfMonth.contains(day.day);
+
+      case 3: // specific days of the year
+        final specificDates =
+            (frequency['specificDates'] as List<dynamic>?) ?? [];
+        final formatted = DateFormat('MMMM d').format(day);
+        return specificDates.contains(formatted);
+
+      case 5: // repeat every X days
+        final startDateRaw = frequency['startDate'];
+        if (startDateRaw == null) return false;
+        final startDate = _parseDate(startDateRaw);
+        if (startDate == null) return false;
+
+        final interval = frequency['interval'] as int? ?? 1;
+        if (day.isBefore(startDate)) return false;
+
+        final diff = day.difference(startDate).inDays;
+        return (diff % interval == 0);
+
+      default:
+        return false;
+    }
+  }
+
+  DateTime? _parseDate(dynamic raw) {
+    if (raw is Timestamp) {
+      return raw.toDate();
+    } else if (raw is String) {
+      return DateTime.tryParse(raw);
+    }
+    return null;
   }
 }
