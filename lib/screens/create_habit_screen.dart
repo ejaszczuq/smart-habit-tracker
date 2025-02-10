@@ -10,11 +10,11 @@ class CustomButton extends StatelessWidget {
   final ButtonStyle style;
 
   const CustomButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.onPressed,
     required this.style,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +47,7 @@ class CustomButton extends StatelessWidget {
 }
 
 class CreateHabitScreen extends StatefulWidget {
-  const CreateHabitScreen({Key? key}) : super(key: key);
+  const CreateHabitScreen({super.key});
 
   @override
   State<CreateHabitScreen> createState() => _CreateHabitScreenState();
@@ -93,6 +93,9 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       return;
     }
 
+    // Convert the user-chosen string frequency to an int
+    final int freqType = _frequencyStringToInt(_selectedFrequency);
+
     final Map<String, dynamic> habitData = {
       'name': _nameController.text,
       'description': _descriptionController.text,
@@ -100,7 +103,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       'color': selectedColorLabel,
       'evaluationMethod': _evaluationMethod,
       'frequency': {
-        'type': _selectedFrequency,
+        'type': freqType, // <-- now stored as int instead of String
         'daysOfWeek': _selectedDaysOfWeek.isNotEmpty
             ? _selectedDaysOfWeek.toList()
             : null,
@@ -127,6 +130,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
 
     habitData['frequency'].removeWhere((key, value) => value == null);
 
+
     try {
       await _userService.saveHabit(uid, habitData);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,6 +141,34 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       print('Error creating habit: $e');
     }
   }
+
+  /// Converts a frequency string into an integer value recognized by the calendar widgets.
+  /// Mapping:
+  /// 0: "Every day"
+  /// 1: "Specific days of the week"
+  /// 2: "Specific days of the month"
+  /// 3: "Specific days of the year"
+  /// 4: "Some days per period"
+  /// 5: "Repeat"
+  int _frequencyStringToInt(String? freq) {
+    switch (freq) {
+      case "Every day":
+        return 0;
+      case "Specific days of the week":
+        return 1;
+      case "Specific days of the month":
+        return 2;
+      case "Specific days of the year":
+        return 3;
+      case "Some days per period":
+        return 4;
+      case "Repeat":
+        return 5;
+      default:
+        return 0; // Fallback if null or unrecognized
+    }
+  }
+
 
   Widget _buildSection({required String title, required Widget child}) {
     return Card(
@@ -939,25 +971,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Habit Creator',
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
-      ),
-      home: const CreateHabitScreen(),
     );
   }
 }
