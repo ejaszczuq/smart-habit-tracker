@@ -1,9 +1,104 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:smart_habit_tracker/screens/create_habit_screen.dart';
+import 'package:smart_habit_tracker/screens/edit_habit_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
+
+/// Widget rysujący przerywaną ramkę wokół [child]
+class DashedBorder extends StatelessWidget {
+  final Widget child;
+  final Color color;
+  final double dashWidth;
+  final double dashSpace;
+  final double strokeWidth;
+  final BorderRadius? borderRadius;
+
+  const DashedBorder({
+    super.key,
+    required this.child,
+    this.color = Colors.grey,
+    this.dashWidth = 5.0,
+    this.dashSpace = 3.0,
+    this.strokeWidth = 1.0,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(
+        color: color,
+        dashWidth: dashWidth,
+        dashSpace: dashSpace,
+        strokeWidth: strokeWidth,
+        borderRadius: borderRadius,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double dashWidth;
+  final double dashSpace;
+  final double strokeWidth;
+  final BorderRadius? borderRadius;
+
+  _DashedBorderPainter({
+    required this.color,
+    required this.dashWidth,
+    required this.dashSpace,
+    required this.strokeWidth,
+    this.borderRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rect = Offset.zero & size;
+    final path = Path();
+
+    if (borderRadius != null) {
+      path.addRRect(borderRadius!.toRRect(rect));
+    } else {
+      path.addRect(rect);
+    }
+
+    final dashedPath = _createDashedPath(path);
+    canvas.drawPath(dashedPath, paint);
+  }
+
+  Path _createDashedPath(Path source) {
+    final Path path = Path();
+    for (final PathMetric metric in source.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final double len = dashWidth;
+        path.addPath(metric.extractPath(distance, distance + len), Offset.zero);
+        distance += dashWidth + dashSpace;
+      }
+    }
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.dashWidth != dashWidth ||
+        oldDelegate.dashSpace != dashSpace ||
+        oldDelegate.strokeWidth != strokeWidth;
+  }
+}
 
 class CalendarWidget extends StatefulWidget {
   const CalendarWidget({super.key});
@@ -217,24 +312,63 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
-  void _showDeleteDialog(String habitId) {
+  void _showManageHabitDialog(String habitId) {
+    // Retrieve the full habit object from the list using its ID
+    final habit = habits.firstWhere((element) => element['id'] == habitId);
+
     showDialog(
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text('Delete Habit'),
-          content: const Text('Are you sure you want to delete this habit?'),
+          title: const Text('Manage Habit'),
+          content: const Text('Would you like to edit or delete this habit?'),
           actions: [
+            // Cancel button (Closes the dialog)
             TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
+
+            // Edit Habit button (Opens the edit screen)
             TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              onPressed: () {
+                if (mounted) {
+                  Navigator.pop(context); // Close the dialog first
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditHabitScreen(habit: habit),
+                  ),
+                );
+              },
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit, color: T.violet_0, size: 18),
+                  SizedBox(width: 3),
+                  Text('Edit', style: TextStyle(color: T.violet_0)),
+                ],
+              ),
+            ),
+
+            // Delete Habit button (Deletes the habit)
+            TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: () {
                 Navigator.pop(context);
                 _deleteHabit(habitId);
               },
-              child: const Text('Delete'),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.delete, color: T.violet_0, size: 18),
+                  SizedBox(width: 3),
+                  Text('Delete', style: TextStyle(color: T.violet_0)),
+                ],
+              ),
             ),
           ],
         );
@@ -388,6 +522,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
     final habitsForDate = _getHabitsForSelectedDate(selectedDate);
     return Column(
       children: [
+        // Pasek dat – przewijalna lista dat
         SizedBox(
           height: 80,
           child: ScrollablePositionedList.builder(
@@ -484,111 +619,209 @@ class CalendarWidgetState extends State<CalendarWidget> {
           'Habits for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}',
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              await _loadUserHabits();
-              await _loadCompletionStatusForDate(selectedDate);
-            },
-            child: ListView.builder(
-              itemCount: habitsForDate.length,
-              itemBuilder: (context, index) {
-                final habit = habitsForDate[index];
-                final habitId = habit['id'];
-                final completionDate =
-                    DateFormat('yyyy-MM-dd').format(selectedDate);
-                final isCompleted =
-                    completionStatus[habitId]?[completionDate] ?? false;
-                final habitColor = _colorFromLabel(habit['color'] as String?);
+        const SizedBox(height: 12.5),
 
-                return GestureDetector(
-                  onLongPress: () => _showDeleteDialog(habitId),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 25, vertical: 6),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: isCompleted
-                            ? LinearGradient(
-                                colors: [
-                                  habitColor.withOpacity(0.3),
-                                  habitColor.withOpacity(0.1),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : null,
-                        color: isCompleted ? null : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                        border: Border.all(
-                            color: habitColor.withOpacity(0.5), width: 1),
-                      ),
-                      child: ListTile(
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12),
-                        leading: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: habitColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Icon(
-                              _iconFromLabel(habit['icon'] as String?),
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          habit['name'] ?? 'No Name',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: T.black_0,
-                            fontSize: 14,
-                          ),
-                        ),
-                        subtitle: Text(
-                          habit['description'] ?? 'No Description',
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 12,
-                          ),
-                        ),
-                        trailing: IconButton(
-                          icon: isCompleted
-                              ? Icon(
-                                  Icons.check_box_outlined,
-                                  color: habitColor,
-                                  size: 24,
-                                )
-                              : const Icon(
-                                  Icons.check_box_outline_blank_outlined,
-                                  color: Colors.grey,
-                                  size: 24,
-                                ),
-                          onPressed: () {
-                            _toggleHabitCompletion(
-                              habitId,
-                              selectedDate,
-                              !isCompleted,
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                );
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(20), bottom: Radius.circular(20)),
+            ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await _loadUserHabits();
+                await _loadCompletionStatusForDate(selectedDate);
               },
+              child: habitsForDate.isEmpty
+                  ? Center(
+                      child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/images/not-found.png',
+                          width: 125,
+                          height: 125,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          "Upps, nothing there yet!",
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ))
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(top: 10, bottom: 20),
+                      itemCount: habitsForDate.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index < habitsForDate.length) {
+                          final habit = habitsForDate[index];
+                          final habitId = habit['id'];
+                          final completionDate =
+                              DateFormat('yyyy-MM-dd').format(selectedDate);
+                          final isCompleted = completionStatus[habitId]
+                                  ?[completionDate] ??
+                              false;
+                          final habitColor =
+                              _colorFromLabel(habit['color'] as String?);
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 25, vertical: 8),
+                            child: Material(
+                              elevation: isCompleted ? 4 : 2,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onLongPress: () =>
+                                    _showManageHabitDialog(habitId),
+                                onTap: () => _toggleHabitCompletion(
+                                  habitId,
+                                  selectedDate,
+                                  !isCompleted,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    gradient: isCompleted
+                                        ? LinearGradient(
+                                            colors: [
+                                              habitColor.withOpacity(0.4),
+                                              habitColor.withOpacity(0.2),
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          )
+                                        : null,
+                                    color: isCompleted ? null : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                    border: Border.all(
+                                      color: habitColor.withOpacity(0.5),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 42,
+                                        height: 42,
+                                        decoration: BoxDecoration(
+                                          color: habitColor,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            _iconFromLabel(
+                                                habit['icon'] as String?),
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              habit['name'] ?? 'No Name',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: T.black_0,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              habit['description'] ??
+                                                  'No Description',
+                                              style: const TextStyle(
+                                                color: Colors.black87,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(
+                                        isCompleted
+                                            ? Icons.check_box_outlined
+                                            : Icons
+                                                .check_box_outline_blank_outlined,
+                                        color: isCompleted
+                                            ? habitColor
+                                            : Colors.grey,
+                                        size: 24,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        } else {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 25, vertical: 8),
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CreateHabitScreen()),
+                                );
+                              },
+                              child: DashedBorder(
+                                dashWidth: 5,
+                                dashSpace: 3,
+                                strokeWidth: 1,
+                                color: Colors.grey,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Center(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.auto_awesome,
+                                            color: Colors.grey),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "More habits, more progress!",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
             ),
           ),
         ),
