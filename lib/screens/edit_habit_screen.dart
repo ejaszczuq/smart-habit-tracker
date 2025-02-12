@@ -12,9 +12,9 @@ class EditHabitScreen extends StatefulWidget {
   final Map<String, dynamic> habit;
 
   const EditHabitScreen({
-    Key? key,
+    super.key,
     required this.habit,
-  }) : super(key: key);
+  });
 
   @override
   State<EditHabitScreen> createState() => _EditHabitScreenState();
@@ -37,12 +37,14 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
   String _evaluationMethod = 'Yes/No';
 
   // Frequency
-  int _freqType = 0;  // (0: every day, 1: days of week, 2: days of month, etc.)
+  int _freqType = 0; // (0: every day, 1: days of week, 2: days of month, etc.)
   final Set<String> _selectedDaysOfWeek = {};
   final Set<int> _selectedDaysOfMonth = {};
   final List<String> _selectedDates = [];
-  final TextEditingController _daysPerPeriodController = TextEditingController();
-  final TextEditingController _repeatIntervalController = TextEditingController();
+  final TextEditingController _daysPerPeriodController =
+      TextEditingController();
+  final TextEditingController _repeatIntervalController =
+      TextEditingController();
   String? _selectedPeriod; // e.g. 'Week', 'Month', 'Year'
 
   // Reminders
@@ -131,8 +133,9 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       'evaluationMethod': _evaluationMethod,
       'frequency': {
         'type': _freqType,
-        'daysOfWeek':
-        _selectedDaysOfWeek.isNotEmpty ? _selectedDaysOfWeek.toList() : null,
+        'daysOfWeek': _selectedDaysOfWeek.isNotEmpty
+            ? _selectedDaysOfWeek.toList()
+            : null,
         'daysOfMonth': _selectedDaysOfMonth.isNotEmpty
             ? _selectedDaysOfMonth.toList()
             : null,
@@ -190,33 +193,33 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       onTap: onTapToggleEdit,
       child: isEditable
           ? TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: T.purple_1),
-          enabledBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.grey, width: 0.5),
-          ),
-          focusedBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: T.violet_0, width: 0.5),
-          ),
-        ),
-        onSubmitted: (_) => onTapToggleEdit(),
-      )
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: label,
+                prefixIcon: Icon(icon, color: T.purple_1),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 0.5),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: T.violet_0, width: 0.5),
+                ),
+              ),
+              onSubmitted: (_) => onTapToggleEdit(),
+            )
           : Row(
-        children: [
-          Icon(icon, color: T.purple_1),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              controller.text.isNotEmpty
-                  ? controller.text
-                  : 'Tap to edit...',
-              style: T.bodyRegular,
+              children: [
+                Icon(icon, color: T.purple_1),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    controller.text.isNotEmpty
+                        ? controller.text
+                        : 'Tap to edit...',
+                    style: T.bodyRegular,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -576,7 +579,8 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text("Month", style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text("Month",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(
                           height: 120,
                           child: ListWheelScrollView.useDelegate(
@@ -600,11 +604,23 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                                   },
                                   child: Container(
                                     alignment: Alignment.center,
-                                    color: selectedMonth == i + 1 ? Colors.purple.shade100 : Colors.transparent,
+                                    color: selectedMonth == i + 1
+                                        ? Colors.purple.shade100
+                                        : Colors.transparent,
                                     child: Text(
                                       [
-                                        'January','February','March','April','May','June',
-                                        'July','August','September','October','November','December'
+                                        'January',
+                                        'February',
+                                        'March',
+                                        'April',
+                                        'May',
+                                        'June',
+                                        'July',
+                                        'August',
+                                        'September',
+                                        'October',
+                                        'November',
+                                        'December'
                                       ][i],
                                       style: TextStyle(
                                         fontSize: 16,
@@ -630,7 +646,8 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text("Day", style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text("Day",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         SizedBox(
                           height: 120,
                           child: ListWheelScrollView.useDelegate(
@@ -643,7 +660,8 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                               });
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
-                              children: List.generate(monthDays[selectedMonth]!, (i) {
+                              children:
+                                  List.generate(monthDays[selectedMonth]!, (i) {
                                 return GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
@@ -653,7 +671,9 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                                   },
                                   child: Container(
                                     alignment: Alignment.center,
-                                    color: selectedDay == i + 1 ? Colors.purple.shade100 : Colors.transparent,
+                                    color: selectedDay == i + 1
+                                        ? Colors.purple.shade100
+                                        : Colors.transparent,
                                     child: Text(
                                       (i + 1).toString(),
                                       style: TextStyle(
@@ -686,10 +706,21 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                   onPressed: () {
                     setState(() {
                       final monthNames = [
-                        'January','February','March','April','May','June',
-                        'July','August','September','October','November','December'
+                        'January',
+                        'February',
+                        'March',
+                        'April',
+                        'May',
+                        'June',
+                        'July',
+                        'August',
+                        'September',
+                        'October',
+                        'November',
+                        'December'
                       ];
-                      _selectedDates.add("${monthNames[selectedMonth - 1]} $selectedDay");
+                      _selectedDates
+                          .add("${monthNames[selectedMonth - 1]} $selectedDay");
                     });
                     Navigator.pop(dialogCtx);
                   },
@@ -790,7 +821,8 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                   enabled: _remindersEnabled,
                   controller: _reminderTimeController,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.access_time, color: T.purple_1),
+                    prefixIcon:
+                        const Icon(Icons.access_time, color: T.purple_1),
                     hintText: 'Time',
                     enabledBorder: OutlineInputBorder(
                       borderSide: const BorderSide(color: Colors.grey),
@@ -801,7 +833,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     contentPadding:
-                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   ),
                   style: const TextStyle(fontSize: 14),
                 ),
@@ -812,10 +844,10 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                   value: _reminderFrequency,
                   onChanged: _remindersEnabled
                       ? (value) {
-                    setState(() {
-                      _reminderFrequency = value!;
-                    });
-                  }
+                          setState(() {
+                            _reminderFrequency = value!;
+                          });
+                        }
                       : null,
                   items: ['Every day', 'Specific day'].map((freq) {
                     return DropdownMenuItem(value: freq, child: Text(freq));
@@ -917,16 +949,19 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                           ),
                           child: Row(
                             children: [
-                              Icon(_selectedIcon, size: 40, color: Colors.black),
+                              Icon(_selectedIcon,
+                                  size: 40, color: Colors.black),
                               const SizedBox(width: 8),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     _selectedIconLabel,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
-                                  const Text("Tap to change", style: TextStyle(color: Colors.grey)),
+                                  const Text("Tap to change",
+                                      style: TextStyle(color: Colors.grey)),
                                 ],
                               ),
                             ],
@@ -961,9 +996,11 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                                 children: [
                                   Text(
                                     _selectedColorLabel,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
-                                  const Text("Tap to change", style: TextStyle(color: Colors.grey)),
+                                  const Text("Tap to change",
+                                      style: TextStyle(color: Colors.grey)),
                                 ],
                               ),
                             ],
