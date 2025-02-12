@@ -26,24 +26,23 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  String name = '', email = '', password = '', confirmPassword = '';
-
-  bool isPasswordVisible = false;
-  bool isConfirmPasswordVisible = false;
-  bool isTermsAccepted = false;
-  bool isKeyboardOpen = false;
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   final FocusNode nameFocusNode = FocusNode();
   final FocusNode emailFocusNode = FocusNode();
   final FocusNode passwordFocusNode = FocusNode();
   final FocusNode confirmPasswordFocusNode = FocusNode();
 
-  TextEditingController nameController = TextEditingController();
-  TextEditingController emailController = TextEditingController();
-  TextEditingController passwordController = TextEditingController();
-  TextEditingController confirmPasswordController = TextEditingController();
-
   final _formKey = GlobalKey<FormState>();
+
+  bool isPasswordVisible = false;
+  bool isConfirmPasswordVisible = false;
+  bool isTermsAccepted = false;
+  bool isKeyboardOpen = false;
 
   @override
   void initState() {
@@ -91,9 +90,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  /// Email/Password registration
   Future<void> registration() async {
     if (!_formKey.currentState!.validate()) return;
+
     if (!isTermsAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -107,14 +106,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     try {
-      // Create user with email/password
       final UserCredential userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      // Save user details in Firestore
       final user = userCredential.user!;
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'name': nameController.text.trim(),
@@ -122,7 +119,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Update displayName in Firebase Auth
       await user.updateProfile(displayName: nameController.text.trim());
       await user.reload();
 
@@ -143,9 +139,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } on FirebaseAuthException catch (e) {
       String errorMessage = '';
       if (e.code == 'weak-password') {
-        errorMessage = 'Password Provided is too Weak';
+        errorMessage = 'Password provided is too weak';
       } else if (e.code == 'email-already-in-use') {
-        errorMessage = 'Account Already Exists';
+        errorMessage = 'Account already exists';
       } else {
         errorMessage = 'An error occurred. Please try again.';
       }
@@ -174,28 +170,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /// Google Sign-Up (actually the same as signInWithGoogle: if user is new, account is created)
   Future<void> signUpWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
-        // The user canceled the sign-in flow
         return;
       }
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Get the credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase
       final UserCredential userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
 
-      // If it's a new user, create a document in Firestore
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -231,7 +222,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /// Apple Sign-Up (similar to signInWithApple)
   Future<void> signUpWithApple() async {
     if (!Platform.isIOS && !Platform.isMacOS) {
       if (!mounted) return;
@@ -259,7 +249,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final UserCredential userCredential =
           await FirebaseAuth.instance.signInWithCredential(oauthCredential);
 
-      // If it's a new user, create a doc in Firestore
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -295,10 +284,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required String hint,
+    required String iconAsset,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Padding(
+        padding: const EdgeInsets.only(left: 0, right: 10),
+        child: ShaderMask(
+          shaderCallback: (Rect bounds) {
+            return T.gradient_0.createShader(bounds);
+          },
+          blendMode: BlendMode.srcIn,
+          child: SvgPicture.asset(iconAsset),
+        ),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+      contentPadding: const EdgeInsets.only(top: 10, bottom: 10),
+      suffixIcon: suffixIcon,
+      errorStyle: const TextStyle(color: Colors.red, fontSize: 12),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // AppBar
       appBar: AppBar(
         title: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 56.0),
@@ -329,104 +343,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       key: _formKey,
                       child: Column(
                         children: [
-                          // Name
                           const SizedBox(height: 15.0),
                           SizedBox(
                             width: 305,
                             child: TextFormField(
                               focusNode: nameFocusNode,
                               controller: nameController,
-                              decoration: InputDecoration(
-                                labelText: 'Name',
-                                hintText: 'Your full name',
-                                prefixIcon: Padding(
-                                  padding:
-                                      const EdgeInsets.only(left: 0, right: 10),
-                                  child: ShaderMask(
-                                    shaderCallback: (Rect bounds) {
-                                      return T.gradient_0.createShader(bounds);
-                                    },
-                                    blendMode: BlendMode.srcIn,
-                                    child: SvgPicture.asset(
-                                      'assets/icons/write-icon.svg',
-                                    ),
-                                  ),
-                                ),
-                                prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 30, minHeight: 30),
-                                contentPadding:
-                                    const EdgeInsets.only(top: 10, bottom: 10),
+                              decoration: _buildInputDecoration(
+                                label: 'Name',
+                                hint: 'Your full name',
+                                iconAsset: 'assets/icons/write-icon.svg',
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty) {
+                                if (value == null || value.trim().isEmpty) {
                                   return 'Please enter your name';
+                                }
+                                if (value.trim().length < 2) {
+                                  return 'Name is too short';
                                 }
                                 return null;
                               },
                             ),
                           ),
                           const SizedBox(height: 8.0),
-
-                          // Email
                           SizedBox(
                             width: 305,
                             child: TextFormField(
                               focusNode: emailFocusNode,
                               controller: emailController,
-                              decoration: InputDecoration(
-                                labelText: 'Email',
-                                hintText: 'email@example.com',
-                                prefixIcon: Padding(
-                                  padding:
-                                      const EdgeInsets.only(left: 0, right: 10),
-                                  child: ShaderMask(
-                                    shaderCallback: (Rect bounds) {
-                                      return T.gradient_0.createShader(bounds);
-                                    },
-                                    blendMode: BlendMode.srcIn,
-                                    child: SvgPicture.asset(
-                                      'assets/icons/email-icon.svg',
-                                    ),
-                                  ),
-                                ),
-                                prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 30, minHeight: 30),
-                                contentPadding:
-                                    const EdgeInsets.only(top: 10, bottom: 10),
+                              decoration: _buildInputDecoration(
+                                label: 'Email',
+                                hint: 'email@example.com',
+                                iconAsset: 'assets/icons/email-icon.svg',
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty) {
+                                if (value == null || value.trim().isEmpty) {
                                   return 'Please enter your email';
+                                }
+
+                                final emailRegex =
+                                    RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                if (!emailRegex.hasMatch(value.trim())) {
+                                  return 'Please enter a valid email';
                                 }
                                 return null;
                               },
                             ),
                           ),
                           const SizedBox(height: 12.0),
-
-                          // Password
                           SizedBox(
                             width: 305,
                             child: TextFormField(
                               focusNode: passwordFocusNode,
                               controller: passwordController,
                               obscureText: !isPasswordVisible,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                hintText: '*******',
-                                prefixIcon: Padding(
-                                  padding:
-                                      const EdgeInsets.only(left: 0, right: 10),
-                                  child: ShaderMask(
-                                    shaderCallback: (Rect bounds) {
-                                      return T.gradient_0.createShader(bounds);
-                                    },
-                                    blendMode: BlendMode.srcIn,
-                                    child: SvgPicture.asset(
-                                      'assets/icons/password-icon.svg',
-                                    ),
-                                  ),
-                                ),
+                              decoration: _buildInputDecoration(
+                                label: 'Password',
+                                hint: '*******',
+                                iconAsset: 'assets/icons/password-icon.svg',
                                 suffixIcon: GestureDetector(
                                   onTap: () {
                                     setState(() {
@@ -440,44 +414,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     color: T.grey_1,
                                   ),
                                 ),
-                                prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 30, minHeight: 30),
-                                contentPadding:
-                                    const EdgeInsets.only(top: 10, bottom: 10),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Please enter your password';
+                                }
+                                if (value.length < 6) {
+                                  return 'Password must be at least 6 characters long';
+                                }
+
+                                final passwordRegex = RegExp(
+                                    r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$');
+                                if (!passwordRegex.hasMatch(value)) {
+                                  return 'Password must include letters and numbers';
                                 }
                                 return null;
                               },
                             ),
                           ),
                           const SizedBox(height: 12.0),
-
-                          // Confirm Password
                           SizedBox(
                             width: 305,
                             child: TextFormField(
                               focusNode: confirmPasswordFocusNode,
                               controller: confirmPasswordController,
                               obscureText: !isConfirmPasswordVisible,
-                              decoration: InputDecoration(
-                                labelText: 'Confirm Password',
-                                hintText: '*******',
-                                prefixIcon: Padding(
-                                  padding:
-                                      const EdgeInsets.only(left: 0, right: 10),
-                                  child: ShaderMask(
-                                    shaderCallback: (Rect bounds) {
-                                      return T.gradient_0.createShader(bounds);
-                                    },
-                                    blendMode: BlendMode.srcIn,
-                                    child: SvgPicture.asset(
-                                      'assets/icons/password-icon.svg',
-                                    ),
-                                  ),
-                                ),
+                              decoration: _buildInputDecoration(
+                                label: 'Confirm Password',
+                                hint: '*******',
+                                iconAsset: 'assets/icons/password-icon.svg',
                                 suffixIcon: GestureDetector(
                                   onTap: () {
                                     setState(() {
@@ -492,10 +457,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     color: T.grey_1,
                                   ),
                                 ),
-                                prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 30, minHeight: 30),
-                                contentPadding:
-                                    const EdgeInsets.only(top: 10, bottom: 10),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -509,8 +470,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                           ),
                           const SizedBox(height: 18.0),
-
-                          // Terms and Conditions Checkbox
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -577,10 +536,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ],
                           ),
-
                           const SizedBox(height: 16.0),
-
-                          // Sign Up Button
                           SizedBox(
                             width: 315,
                             child: CustomButton(
@@ -593,8 +549,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                           ),
                           const SizedBox(height: 22.0),
-
-                          // Google / Apple signup
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -716,8 +670,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
-
-            // Footer with "Log in" prompt
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),
