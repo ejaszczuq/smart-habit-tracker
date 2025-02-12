@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/habit_mini_calendar.dart';
+import 'edit_habit_screen.dart';
 import 'habit_statistics_screen.dart';
 
 class HabitsScreen extends StatefulWidget {
@@ -109,8 +110,14 @@ class HabitsScreenState extends State<HabitsScreen> {
                                       IconButton(
                                         icon: const Icon(Icons.more_horiz),
                                         onPressed: () {
-                                          // TODO: Add more options if needed
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => EditHabitScreen(habit: habit),
+                                            ),
+                                          );
                                         },
+
                                       ),
                                     ],
                                   ),
