@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:smart_habit_tracker/typography.dart';
 import '../widgets/habit_mini_calendar.dart';
 import 'edit_habit_screen.dart';
 import 'habit_statistics_screen.dart';
@@ -45,11 +46,20 @@ class HabitsScreenState extends State<HabitsScreen> {
     final weekDates = getWeekDates();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Habits Overview'),
+        // AppBar with gradient background using typography colors
+        title: Text('Habits Overview', style: T.h3.copyWith(color: T.white_0)),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: T.gradient_1,
+          ),
+        ),
         actions: [
           // Gear icon in the top-right corner
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings, color: T.white_0),
             onPressed: () => _showSettingsDialog(),
           ),
         ],
@@ -66,13 +76,14 @@ class HabitsScreenState extends State<HabitsScreen> {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
                     return Center(
-                      child: Text('Error: ${snapshot.error}'),
+                      child: Text('Error: ${snapshot.error}',
+                          style: T.bodyRegular),
                     );
                   } else {
                     final habits = snapshot.data ?? [];
                     if (habits.isEmpty) {
-                      return const Center(
-                        child: Text('No habits found.'),
+                      return Center(
+                        child: Text('No habits found.', style: T.bodyRegular),
                       );
                     }
                     return ListView.builder(
@@ -80,22 +91,35 @@ class HabitsScreenState extends State<HabitsScreen> {
                       itemBuilder: (context, index) {
                         final habit = habits[index];
                         return Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 4,
                           margin: const EdgeInsets.symmetric(vertical: 8),
+                          color: T.white_0,
                           child: Padding(
-                            padding: const EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(16.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 ListTile(
-                                  leading: const Icon(Icons.check_circle),
-                                  title: Text(habit['name'] ?? 'No Name'),
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.check,
+                                      color: T.violet_0),
+                                  title: Text(
+                                    habit['name'] ?? 'No Name',
+                                    style: T.bodyLargeBold,
+                                  ),
                                   subtitle: Text(
-                                      habit['description'] ?? 'No Description'),
+                                    habit['description'] ?? 'No Description',
+                                    style: T.bodyRegular,
+                                  ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.bar_chart),
+                                        icon: const Icon(Icons.bar_chart,
+                                            color: T.purple_1),
                                         onPressed: () {
                                           Navigator.push(
                                             context,
@@ -108,16 +132,17 @@ class HabitsScreenState extends State<HabitsScreen> {
                                         },
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.more_horiz),
+                                        icon: const Icon(Icons.edit_document,
+                                            color: T.purple_1),
                                         onPressed: () {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (context) => EditHabitScreen(habit: habit),
+                                              builder: (context) =>
+                                                  EditHabitScreen(habit: habit),
                                             ),
                                           );
                                         },
-
                                       ),
                                     ],
                                   ),
@@ -153,12 +178,15 @@ class HabitsScreenState extends State<HabitsScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Settings'),
-          content: const Text('Choose an action:'),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Settings', style: T.h3),
+          content: Text('Choose an action:', style: T.bodyRegular),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text('Cancel',
+                  style: T.bodyRegularBold.copyWith(color: T.violet_0)),
             ),
             TextButton(
               onPressed: () async {
@@ -173,10 +201,11 @@ class HabitsScreenState extends State<HabitsScreen> {
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   '/', // or your main route
-                      (route) => false,
+                  (route) => false,
                 );
               },
-              child: const Text('Logout'),
+              child: Text('Logout',
+                  style: T.bodyRegularBold.copyWith(color: T.violet_0)),
             ),
           ],
         );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
 class HabitMiniCalendar extends StatelessWidget {
   final Map<String, dynamic> habit;
@@ -118,9 +119,9 @@ class HabitMiniCalendar extends StatelessWidget {
 
             Color circleColor;
             if (state == 2) {
-              circleColor = Colors.green.withOpacity(0.5);
+              circleColor = T.violet_2.withOpacity(0.5);
             } else if (state == 1) {
-              circleColor = Colors.yellow.withOpacity(0.5);
+              circleColor = T.grey_2;
             } else {
               circleColor = Colors.grey[300]!;
             }
@@ -132,7 +133,7 @@ class HabitMiniCalendar extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: state > 0 ? Colors.black : Colors.grey,
+                    color: state > 0 ? T.violet_3 : Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 2),
