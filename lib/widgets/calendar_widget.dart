@@ -9,7 +9,7 @@ import 'package:smart_habit_tracker/screens/create_habit_screen.dart';
 import 'package:smart_habit_tracker/screens/edit_habit_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
-/// Widget rysujący przerywaną ramkę wokół [child]
+/// Widget for drawing a dashed border around [child].
 class DashedBorder extends StatelessWidget {
   final Widget child;
   final Color color;
@@ -121,7 +121,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
     super.initState();
     days = List.generate(
       2 * daysOffset,
-      (index) => DateTime.now().add(Duration(days: index - daysOffset)),
+          (index) => DateTime.now().add(Duration(days: index - daysOffset)),
     );
     selectedDate = DateTime.now();
     activeDayIndex = days.indexWhere((d) => _isSameDay(d, DateTime.now()));
@@ -155,14 +155,16 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
+  /// Loads 'completed' flags or checklist arrays for the selected date
   Future<void> _loadCompletionStatusForDate(DateTime date) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
       final formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
+      // For each habit, read its doc in 'completion'
       for (var habit in habits) {
-        final completionSnapshot = await FirebaseFirestore.instance
+        final completionDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .collection('habits')
@@ -171,14 +173,27 @@ class CalendarWidgetState extends State<CalendarWidget> {
             .doc(formattedDate)
             .get();
 
+        bool isCompleted = false;
+        if (completionDoc.exists) {
+          if (habit['evaluationMethod'] == 'Checklist') {
+            // If it's a checklist, interpret completion = all subtasks done
+            final subTasks = habit['subTasks'] ?? [];
+            final doneTasks = completionDoc.data()?['checklist'] ?? [];
+            isCompleted = subTasks.isNotEmpty &&
+                (doneTasks.length == subTasks.length);
+          } else {
+            // Otherwise read 'completed'
+            isCompleted = completionDoc.data()?['completed'] ?? false;
+          }
+        }
+
         setState(() {
           completionStatus[habit['id']] ??= {};
-          completionStatus[habit['id']]![formattedDate] =
-              completionSnapshot.exists &&
-                  (completionSnapshot.data()?['completed'] ?? false);
+          completionStatus[habit['id']]![formattedDate] = isCompleted;
         });
       }
 
+      // Additional logic for type=4: ensure 'completions' map is initialized
       final periodKey = _getCurrentPeriodKey(date, 'Week');
       for (var habit in habits) {
         final habitRef = FirebaseFirestore.instance
@@ -206,13 +221,33 @@ class CalendarWidgetState extends State<CalendarWidget> {
     }
   }
 
+  /// Called when user taps a habit in the list
   Future<void> _toggleHabitCompletion(
-    String habitId,
-    DateTime date,
-    bool isCompleted,
-  ) async {
+      String habitId,
+      DateTime date,
+      ) async {
+    // Find the habit data
+    final habit = habits.firstWhere((h) => h['id'] == habitId);
+    final evaluationMethod = habit['evaluationMethod'] ?? 'Yes/No';
+
+    if (evaluationMethod == 'Checklist') {
+      // If it's a checklist, open the subtask dialog
+      _showChecklistDialog(habit, date);
+    } else {
+      // For yes/no or other method, just toggle completed
+      _toggleYesNoHabit(habit, date);
+    }
+  }
+
+  /// Toggles a yes/no habit (non-checklist) in Firestore
+  Future<void> _toggleYesNoHabit(
+      Map<String, dynamic> habit,
+      DateTime date,
+      ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
+    final habitId = habit['id'];
     final formattedDate = DateFormat('yyyy-MM-dd').format(date);
     final habitRef = FirebaseFirestore.instance
         .collection('users')
@@ -220,21 +255,27 @@ class CalendarWidgetState extends State<CalendarWidget> {
         .collection('habits')
         .doc(habitId);
 
+    // Current status
+    bool wasCompleted =
+        completionStatus[habitId]?[formattedDate] ?? false;
+    bool isCompleted = !wasCompleted; // toggle
+
     setState(() {
       completionStatus[habitId] ??= {};
       completionStatus[habitId]![formattedDate] = isCompleted;
     });
 
     try {
-      final habitSnapshot = await habitRef.get();
-      final habitData = habitSnapshot.data();
-      if (habitData == null) return;
+      final habitSnap = await habitRef.get();
+      if (!habitSnap.exists) return;
+      final habitData = habitSnap.data();
+      final frequency = habitData?['frequency'];
 
-      final frequency = habitData['frequency'];
       if (frequency != null && frequency['type'] == 4) {
         final period = frequency['periodType'] ?? 'Week';
         final periodKey = _getCurrentPeriodKey(date, period);
         if (isCompleted) {
+          // Mark completed
           await habitRef
               .collection('completion')
               .doc(formattedDate)
@@ -244,6 +285,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
           });
           _updateLocalPeriodCount(habitId, periodKey, 1);
         } else {
+          // Unmark
           await habitRef.collection('completion').doc(formattedDate).delete();
           await habitRef.update({
             'frequency.completions.$periodKey': FieldValue.increment(-1),
@@ -261,13 +303,112 @@ class CalendarWidgetState extends State<CalendarWidget> {
         }
       }
     } catch (e) {
-      debugPrint('Error toggling habit completion: $e');
+      debugPrint('Error toggling yes/no habit: $e');
       setState(() {
-        completionStatus[habitId]?[formattedDate] = !isCompleted;
+        // revert
+        completionStatus[habitId]?[formattedDate] = wasCompleted;
       });
     }
   }
 
+  /// Shows a dialog with the subtask list for a checklist habit
+  Future<void> _showChecklistDialog(
+      Map<String, dynamic> habit,
+      DateTime date,
+      ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final habitId = habit['id'];
+    final List<dynamic> subTasks = habit['subTasks'] ?? [];
+    final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+    final docRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('habits')
+        .doc(habitId)
+        .collection('completion')
+        .doc(formattedDate);
+
+    // Load existing 'checklist' array
+    final docSnap = await docRef.get();
+    List<dynamic> completedSubTasks = [];
+    if (docSnap.exists) {
+      completedSubTasks = (docSnap.data()?['checklist'] ?? []) as List<dynamic>;
+    }
+
+    // We'll store subTaskName -> bool
+    final Map<String, bool> checklistState = {};
+    for (var t in subTasks) {
+      checklistState[t] = completedSubTasks.contains(t);
+    }
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: Text(habit['name'] ?? 'Checklist'),
+          content: StatefulBuilder(
+            builder: (ctx, setDialogState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: checklistState.entries.map((entry) {
+                    final subTaskName = entry.key;
+                    final isChecked = entry.value;
+                    return CheckboxListTile(
+                      title: Text(subTaskName),
+                      value: isChecked,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          checklistState[subTaskName] = value ?? false;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Collect done tasks
+                final doneTasks = checklistState.entries
+                    .where((e) => e.value)
+                    .map((e) => e.key)
+                    .toList();
+
+                // If all subTasks are done => 'completed' = true
+                bool allDone = (doneTasks.length == subTasks.length);
+
+                // Write to Firestore
+                await docRef.set({
+                  'checklist': doneTasks,
+                  'completed': allDone,
+                });
+
+                // Update local completion status
+                setState(() {
+                  completionStatus[habitId] ??= {};
+                  completionStatus[habitId]![formattedDate] = allDone;
+                });
+
+                Navigator.pop(dialogCtx);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Adjust type=4 local counters
   void _updateLocalPeriodCount(String habitId, String periodKey, int delta) {
     final index = habits.indexWhere((h) => h['id'] == habitId);
     if (index == -1) return;
@@ -291,12 +432,22 @@ class CalendarWidgetState extends State<CalendarWidget> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
-      await FirebaseFirestore.instance
+      // Also remove the 'completion' subcollection
+      final habitRef = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('habits')
-          .doc(habitId)
-          .delete();
+          .doc(habitId);
+
+      final completionsSnap = await habitRef.collection('completion').get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (var cDoc in completionsSnap.docs) {
+        batch.delete(cDoc.reference);
+      }
+      await batch.commit();
+
+      await habitRef.delete();
+
       setState(() {
         habits.removeWhere((habit) => habit['id'] == habitId);
         completionStatus.remove(habitId);
@@ -313,9 +464,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
   }
 
   void _showManageHabitDialog(String habitId) {
-    // Retrieve the full habit object from the list using its ID
     final habit = habits.firstWhere((element) => element['id'] == habitId);
-
     showDialog(
       context: context,
       builder: (_) {
@@ -323,20 +472,15 @@ class CalendarWidgetState extends State<CalendarWidget> {
           title: const Text('Manage Habit'),
           content: const Text('Would you like to edit or delete this habit?'),
           actions: [
-            // Cancel button (Closes the dialog)
             TextButton(
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-
-            // Edit Habit button (Opens the edit screen)
             TextButton(
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: () {
-                if (mounted) {
-                  Navigator.pop(context); // Close the dialog first
-                }
+                Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -353,8 +497,6 @@ class CalendarWidgetState extends State<CalendarWidget> {
                 ],
               ),
             ),
-
-            // Delete Habit button (Deletes the habit)
             TextButton(
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: () {
@@ -384,10 +526,10 @@ class CalendarWidgetState extends State<CalendarWidget> {
   }
 
   bool _shouldDisplayHabit(
-    Map<String, dynamic> habit,
-    Map<String, dynamic>? frequency,
-    DateTime date,
-  ) {
+      Map<String, dynamic> habit,
+      Map<String, dynamic>? frequency,
+      DateTime date,
+      ) {
     if (frequency == null) return false;
     final type = frequency['type'];
     switch (type) {
@@ -412,7 +554,8 @@ class CalendarWidgetState extends State<CalendarWidget> {
         final completions = frequency['completions'] ?? {};
         final currentCompletions = completions[currentPeriodKey] ?? 0;
         final dateKey = DateFormat('yyyy-MM-dd').format(date);
-        final isDayCompleted = completionStatus[habit['id']]?[dateKey] ?? false;
+        final isDayCompleted =
+            completionStatus[habit['id']]?[dateKey] ?? false;
         if (isDayCompleted) return true;
         if (currentCompletions < maxOccurrences) {
           return true;
@@ -468,9 +611,9 @@ class CalendarWidgetState extends State<CalendarWidget> {
 
   int _isoWeeksInYear(int year) {
     final p = (year +
-            (year / 4).floor() -
-            (year / 100).floor() +
-            (year / 400).floor()) %
+        (year / 4).floor() -
+        (year / 100).floor() +
+        (year / 400).floor()) %
         7;
     return (p == 4 || p == 3) ? 53 : 52;
   }
@@ -518,11 +661,11 @@ class CalendarWidgetState extends State<CalendarWidget> {
   @override
   Widget build(BuildContext context) {
     final todayIndex =
-        days.indexWhere((date) => _isSameDay(date, DateTime.now()));
+    days.indexWhere((date) => _isSameDay(date, DateTime.now()));
     final habitsForDate = _getHabitsForSelectedDate(selectedDate);
     return Column(
       children: [
-        // Pasek dat – przewijalna lista dat
+        // Horizontal date strip
         SizedBox(
           height: 80,
           child: ScrollablePositionedList.builder(
@@ -535,7 +678,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
               final isToday = _isSameDay(day, DateTime.now());
               final dayOfMonth = DateFormat('d').format(day);
               final dayOfWeek = DateFormat('EEE').format(day);
-              final isActive = activeDayIndex == index;
+              final isActive = (activeDayIndex == index);
 
               final scaleFactor = isActive ? 1.1 : 1.0;
               return SizedBox(
@@ -563,22 +706,22 @@ class CalendarWidgetState extends State<CalendarWidget> {
                             decoration: BoxDecoration(
                               gradient: isActive
                                   ? const LinearGradient(
-                                      colors: [T.violet_0, T.purple_1],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
+                                colors: [T.violet_0, T.purple_1],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
                                   : null,
                               color:
-                                  isActive ? null : T.white_0.withOpacity(0.95),
+                              isActive ? null : T.white_0.withOpacity(0.95),
                               borderRadius: BorderRadius.circular(15),
                               boxShadow: isActive
                                   ? [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ]
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
                                   : [],
                               border: Border.all(
                                 color: isToday ? T.violet_0 : T.grey_2,
@@ -614,6 +757,7 @@ class CalendarWidgetState extends State<CalendarWidget> {
             },
           ),
         ),
+
         const SizedBox(height: 20),
         Text(
           'Habits for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}',
@@ -636,192 +780,195 @@ class CalendarWidgetState extends State<CalendarWidget> {
               },
               child: habitsForDate.isEmpty
                   ? Center(
-                      child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset(
-                          'assets/images/not-found.png',
-                          width: 125,
-                          height: 125,
-                          fit: BoxFit.contain,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/images/not-found.png',
+                        width: 125,
+                        height: 125,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        "Upps, nothing there yet!",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
                         ),
-                        const SizedBox(height: 5),
-                        const Text(
-                          "Upps, nothing there yet!",
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 16,
+                      ),
+                    ],
+                  ))
+                  : ListView.builder(
+                padding: const EdgeInsets.only(top: 10, bottom: 20),
+                itemCount: habitsForDate.length + 1,
+                itemBuilder: (context, index) {
+                  if (index < habitsForDate.length) {
+                    final habit = habitsForDate[index];
+                    final habitId = habit['id'];
+                    final completionDate =
+                    DateFormat('yyyy-MM-dd').format(selectedDate);
+                    final isCompleted =
+                        completionStatus[habitId]?[completionDate] ??
+                            false;
+                    final habitColor =
+                    _colorFromLabel(habit['color'] as String?);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 25, vertical: 8),
+                      child: Material(
+                        elevation: isCompleted ? 4 : 2,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onLongPress: () =>
+                              _showManageHabitDialog(habitId),
+                          // If it's a checklist, we open a dialog
+                          // If it's yes/no, we toggle
+                          onTap: () => _toggleHabitCompletion(
+                            habitId,
+                            selectedDate,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: isCompleted
+                                  ? LinearGradient(
+                                colors: [
+                                  habitColor.withOpacity(0.4),
+                                  habitColor.withOpacity(0.2),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                                  : null,
+                              color: isCompleted ? null : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: habitColor.withOpacity(0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: habitColor,
+                                    borderRadius:
+                                    BorderRadius.circular(8),
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      _iconFromLabel(
+                                          habit['icon'] as String?),
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        habit['name'] ?? 'No Name',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: T.black_0,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        habit['description'] ??
+                                            'No Description',
+                                        style: const TextStyle(
+                                          color: Colors.black87,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  isCompleted
+                                      ? Icons.check_box_outlined
+                                      : Icons
+                                      .check_box_outline_blank_outlined,
+                                  color: isCompleted
+                                      ? habitColor
+                                      : Colors.grey,
+                                  size: 24,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ))
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(top: 10, bottom: 20),
-                      itemCount: habitsForDate.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index < habitsForDate.length) {
-                          final habit = habitsForDate[index];
-                          final habitId = habit['id'];
-                          final completionDate =
-                              DateFormat('yyyy-MM-dd').format(selectedDate);
-                          final isCompleted = completionStatus[habitId]
-                                  ?[completionDate] ??
-                              false;
-                          final habitColor =
-                              _colorFromLabel(habit['color'] as String?);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 25, vertical: 8),
-                            child: Material(
-                              elevation: isCompleted ? 4 : 2,
+                      ),
+                    );
+                  } else {
+                    // Extra "Add new habit" box
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 25, vertical: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                const CreateHabitScreen()),
+                          );
+                        },
+                        child: DashedBorder(
+                          dashWidth: 5,
+                          dashSpace: 3,
+                          strokeWidth: 1,
+                          color: Colors.grey,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onLongPress: () =>
-                                    _showManageHabitDialog(habitId),
-                                onTap: () => _toggleHabitCompletion(
-                                  habitId,
-                                  selectedDate,
-                                  !isCompleted,
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    gradient: isCompleted
-                                        ? LinearGradient(
-                                            colors: [
-                                              habitColor.withOpacity(0.4),
-                                              habitColor.withOpacity(0.2),
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          )
-                                        : null,
-                                    color: isCompleted ? null : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.2),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                    border: Border.all(
-                                      color: habitColor.withOpacity(0.5),
-                                      width: 1,
+                            ),
+                            child: const Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.auto_awesome,
+                                      color: Colors.grey),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "More habits, more progress!",
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400,
                                     ),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 42,
-                                        height: 42,
-                                        decoration: BoxDecoration(
-                                          color: habitColor,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Center(
-                                          child: Icon(
-                                            _iconFromLabel(
-                                                habit['icon'] as String?),
-                                            color: Colors.white,
-                                            size: 20,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              habit['name'] ?? 'No Name',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: T.black_0,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              habit['description'] ??
-                                                  'No Description',
-                                              style: const TextStyle(
-                                                color: Colors.black87,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Icon(
-                                        isCompleted
-                                            ? Icons.check_box_outlined
-                                            : Icons
-                                                .check_box_outline_blank_outlined,
-                                        color: isCompleted
-                                            ? habitColor
-                                            : Colors.grey,
-                                        size: 24,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                ],
                               ),
                             ),
-                          );
-                        } else {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 25, vertical: 8),
-                            child: GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          const CreateHabitScreen()),
-                                );
-                              },
-                              child: DashedBorder(
-                                dashWidth: 5,
-                                dashSpace: 3,
-                                strokeWidth: 1,
-                                color: Colors.grey,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Center(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.auto_awesome,
-                                            color: Colors.grey),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          "More habits, more progress!",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w400,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                    ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
           ),
         ),
