@@ -7,7 +7,7 @@ import '../services/user_service.dart';
 /// Allows editing an existing habit.
 /// The 'habit' Map should include keys like:
 /// 'id', 'name', 'description', 'icon', 'color', 'evaluationMethod',
-/// 'frequency', 'reminders', etc.
+/// 'subTasks', 'frequency', 'reminders', etc.
 class EditHabitScreen extends StatefulWidget {
   final Map<String, dynamic> habit;
 
@@ -23,29 +23,31 @@ class EditHabitScreen extends StatefulWidget {
 class _EditHabitScreenState extends State<EditHabitScreen> {
   final UserService _userService = UserService();
 
-  // Basic text controllers
+  // Basic text controllers for name/description
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  // Icon/color
+  // Icon/color labels & actual data
   String _selectedIconLabel = 'Running';
   IconData _selectedIcon = Icons.run_circle;
   String _selectedColorLabel = 'Violet';
   Color _selectedColor = T.violet_2;
 
-  // Evaluation method
+  // Evaluation method: "Yes/No" or "Checklist"
   String _evaluationMethod = 'Yes/No';
 
+  // Checklist items
+  final TextEditingController _checklistItemController = TextEditingController();
+  List<String> _checklistItems = [];
+
   // Frequency
-  int _freqType = 0; // (0: every day, 1: days of week, 2: days of month, etc.)
+  int _freqType = 0; // (0=Every day, 1=DaysOfWeek, 2=DaysOfMonth, etc.)
   final Set<String> _selectedDaysOfWeek = {};
   final Set<int> _selectedDaysOfMonth = {};
   final List<String> _selectedDates = [];
-  final TextEditingController _daysPerPeriodController =
-      TextEditingController();
-  final TextEditingController _repeatIntervalController =
-      TextEditingController();
-  String? _selectedPeriod; // e.g. 'Week', 'Month', 'Year'
+  final TextEditingController _daysPerPeriodController = TextEditingController();
+  final TextEditingController _repeatIntervalController = TextEditingController();
+  String? _selectedPeriod; // e.g. "Week", "Month", "Year"
 
   // Reminders
   bool _remindersEnabled = false;
@@ -53,7 +55,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
   String _reminderFrequency = 'Every day';
   final TextEditingController _reminderTimeController = TextEditingController();
 
-  // Inline edit toggles
+  // Inline edit toggles for name & description
   bool _isNameEditable = false;
   bool _isDescriptionEditable = false;
 
@@ -61,54 +63,55 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
   void initState() {
     super.initState();
 
-    // Load data from habit map
-    final h = widget.habit;
+    // Load data from the provided habit map
+    final Map<String, dynamic> h = widget.habit;
+
     _nameController.text = h['name'] ?? '';
     _descriptionController.text = h['description'] ?? '';
+
     _selectedIconLabel = h['icon'] ?? 'Running';
     _selectedColorLabel = h['color'] ?? 'Violet';
     _evaluationMethod = h['evaluationMethod'] ?? 'Yes/No';
 
-    // Convert label -> actual icon/color
+    // If it's a checklist method, load subTasks
+    if (_evaluationMethod == 'Checklist') {
+      _checklistItems = List<String>.from(h['subTasks'] ?? []);
+    }
+
+    // Convert label -> actual IconData/Color
     _selectedIcon = _iconFromLabel(_selectedIconLabel);
     _selectedColor = _colorFromLabel(_selectedColorLabel);
 
-    // Frequency
+    // Load frequency data
     final freqData = h['frequency'] as Map<String, dynamic>? ?? {};
     _freqType = (freqData['type'] as int?) ?? 0;
 
-    // Days of week
     if (freqData['daysOfWeek'] != null) {
       for (var day in freqData['daysOfWeek']) {
         _selectedDaysOfWeek.add(day.toString());
       }
     }
-    // Days of month
     if (freqData['daysOfMonth'] != null) {
       for (var day in freqData['daysOfMonth']) {
         _selectedDaysOfMonth.add(int.tryParse(day.toString()) ?? 1);
       }
     }
-    // Specific dates (like "January 5")
     if (freqData['specificDates'] != null) {
       for (var dateStr in freqData['specificDates']) {
         _selectedDates.add(dateStr.toString());
       }
     }
-    // daysPerPeriod
     if (freqData['daysPerPeriod'] != null) {
       _daysPerPeriodController.text = freqData['daysPerPeriod'].toString();
     }
-    // periodType
     if (freqData['periodType'] != null) {
       _selectedPeriod = freqData['periodType'].toString();
     }
-    // interval
     if (freqData['interval'] != null) {
       _repeatIntervalController.text = freqData['interval'].toString();
     }
 
-    // Reminders
+    // Load reminders
     final rem = h['reminders'] as Map<String, dynamic>? ?? {};
     _remindersEnabled = rem['enabled'] == true;
     _reminderTime = rem['time'] ?? '';
@@ -116,7 +119,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     _reminderTimeController.text = _reminderTime;
   }
 
-  /// Update habit in Firestore with current data
+  /// Updates the habit in Firestore with current data
   Future<void> _updateHabit() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -124,13 +127,17 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     final habitId = widget.habit['id'];
     if (habitId == null) return;
 
-    // Build the updated data map
+    // Prepare updated data
     final Map<String, dynamic> updatedHabit = {
       'name': _nameController.text.trim(),
       'description': _descriptionController.text.trim(),
       'icon': _selectedIconLabel,
       'color': _selectedColorLabel,
       'evaluationMethod': _evaluationMethod,
+
+      // If it's a Checklist, store subTasks
+      if (_evaluationMethod == 'Checklist') 'subTasks': _checklistItems,
+
       'frequency': {
         'type': _freqType,
         'daysOfWeek': _selectedDaysOfWeek.isNotEmpty
@@ -148,15 +155,16 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
             ? int.tryParse(_repeatIntervalController.text)
             : null,
       },
+
       'reminders': {
         'enabled': _remindersEnabled,
         'time': _reminderTimeController.text.trim(),
         'frequency': _reminderFrequency,
       },
+
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    // Remove null
     updatedHabit['frequency'].removeWhere((key, value) => value == null);
 
     try {
@@ -171,7 +179,9 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Habit updated successfully!')),
       );
-      Navigator.pop(context);
+
+      // Return 'true' to the previous screen so it can refresh
+      Navigator.pop(context, true);
     } catch (e) {
       debugPrint('Error updating habit: $e');
       if (!mounted) return;
@@ -181,49 +191,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     }
   }
 
-  /// Show inline text or TextField for easy editing
-  Widget _buildEditableField({
-    required String label,
-    required TextEditingController controller,
-    required bool isEditable,
-    required VoidCallback onTapToggleEdit,
-    IconData icon = Icons.edit,
-  }) {
-    return GestureDetector(
-      onTap: onTapToggleEdit,
-      child: isEditable
-          ? TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                labelText: label,
-                prefixIcon: Icon(icon, color: T.purple_1),
-                enabledBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey, width: 0.5),
-                ),
-                focusedBorder: const UnderlineInputBorder(
-                  borderSide: BorderSide(color: T.violet_0, width: 0.5),
-                ),
-              ),
-              onSubmitted: (_) => onTapToggleEdit(),
-            )
-          : Row(
-              children: [
-                Icon(icon, color: T.purple_1),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    controller.text.isNotEmpty
-                        ? controller.text
-                        : 'Tap to edit...',
-                    style: T.bodyRegular,
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  /// Build a repeated Card section (like in CreateHabitScreen)
+  /// Builds a Card-like section for grouping fields
   Widget _buildSection({required String title, required Widget child}) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -246,7 +214,127 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     );
   }
 
-  /// Convert icon label -> actual IconData
+  /// For inline editing of single-line text (like name/description)
+  Widget _buildEditableField({
+    required String label,
+    required TextEditingController controller,
+    required bool isEditable,
+    required VoidCallback onTapToggleEdit,
+    IconData icon = Icons.edit,
+  }) {
+    return GestureDetector(
+      onTap: onTapToggleEdit,
+      child: isEditable
+          ? TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: T.purple_1),
+          enabledBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.grey, width: 0.5),
+          ),
+          focusedBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: T.violet_0, width: 0.5),
+          ),
+        ),
+        onSubmitted: (_) => onTapToggleEdit(),
+      )
+          : Row(
+        children: [
+          Icon(icon, color: T.purple_1),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              controller.text.isNotEmpty
+                  ? controller.text
+                  : 'Tap to edit...',
+              style: T.bodyRegular,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --------------------------
+  // ICON & COLOR PICKERS
+  // --------------------------
+  Widget _buildIconAndColorPickerSection() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: _openIconPicker,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(_selectedIcon, size: 40, color: Colors.black),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedIconLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text("Tap to change",
+                          style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: GestureDetector(
+            onTap: _openColorPicker,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _selectedColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedColorLabel,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text("Tap to change",
+                          style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Icon label => IconData
   IconData _iconFromLabel(String label) {
     switch (label) {
       case 'Walking':
@@ -262,7 +350,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     }
   }
 
-  /// Convert color label -> actual Color
+  /// Color label => Color
   Color _colorFromLabel(String label) {
     switch (label) {
       case 'Red':
@@ -282,7 +370,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     }
   }
 
-  // Show icon picker (like in CreateHabitScreen)
+  /// Opens a dialog to pick a new icon
   void _openIconPicker() {
     final List<Map<String, dynamic>> icons = [
       {'icon': Icons.run_circle, 'label': 'Running'},
@@ -294,7 +382,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (ctx) {
         return AlertDialog(
           title: const Text("Pick an Icon"),
           content: Wrap(
@@ -308,7 +396,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                     _selectedIcon = iconData['icon'];
                     _selectedIconLabel = iconData['label'];
                   });
-                  Navigator.of(context).pop();
+                  Navigator.of(ctx).pop();
                 },
               );
             }).toList(),
@@ -318,7 +406,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     );
   }
 
-  // Show color picker
+  /// Opens a dialog to pick a new color
   void _openColorPicker() {
     final List<Map<String, dynamic>> colors = [
       {'color': Colors.red, 'label': 'Red'},
@@ -331,7 +419,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (ctx) {
         return AlertDialog(
           title: const Text("Pick a Color"),
           content: Wrap(
@@ -344,7 +432,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                     _selectedColor = colorData['color'];
                     _selectedColorLabel = colorData['label'];
                   });
-                  Navigator.of(context).pop();
+                  Navigator.of(ctx).pop();
                 },
                 child: Container(
                   width: 40,
@@ -362,7 +450,9 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     );
   }
 
-  /// We need to map int -> "Every day" / "Specific days of the week"...
+  // --------------------------
+  // FREQUENCY
+  // --------------------------
   String _freqIntToString(int freqType) {
     switch (freqType) {
       case 0:
@@ -382,7 +472,6 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     }
   }
 
-  /// And we do the reverse if user selects from dropdown
   int _frequencyStringToInt(String freq) {
     switch (freq) {
       case "Every day":
@@ -415,6 +504,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Show current frequency in a dropdown
         DropdownButton<String>(
           isExpanded: true,
           value: _freqIntToString(_freqType),
@@ -432,13 +522,13 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
           },
         ),
         const SizedBox(height: 10),
-        // Configuration based on freqType
-        _buildConfigurationWidgetForFrequency(_freqType),
+        // The configuration part depends on freqType
+        _buildFrequencyConfiguration(_freqType),
       ],
     );
   }
 
-  Widget _buildConfigurationWidgetForFrequency(int freqType) {
+  Widget _buildFrequencyConfiguration(int freqType) {
     switch (freqType) {
       case 1:
         return _buildDaysOfWeekPicker();
@@ -451,7 +541,8 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       case 5:
         return _buildRepeatPicker();
       default:
-        return const SizedBox.shrink(); // 0 => "Every day" => no extra config
+      // 0 => "Every day", no extra config
+        return const SizedBox.shrink();
     }
   }
 
@@ -515,8 +606,6 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
   }
 
   Widget _buildDaysOfYearPicker() {
-    // We can reuse the logic from CreateHabitScreen
-    // (with a button that opens a date picking dialog).
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -544,13 +633,16 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     );
   }
 
-  /// Example month-day picker, same as CreateHabitScreen
+  /// Opens a dialog to select [month, day] (e.g. "January 5"), which is then added
+  /// to the list of _selectedDates used for "Specific days of the year" frequency.
   void _openMonthDayPicker() async {
     int selectedMonth = 1;
     int selectedDay = 1;
+
+    // Mapping from month -> number of days.
     final monthDays = {
       1: 31,
-      2: 29,
+      2: 29, // consider leap year
       3: 31,
       4: 30,
       5: 31,
@@ -562,12 +654,14 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       11: 30,
       12: 31,
     };
+
+    // Controllers for the ListWheelScrollViews:
     final monthController = FixedExtentScrollController();
     final dayController = FixedExtentScrollController();
 
     await showDialog(
       context: context,
-      builder: (ctx) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
@@ -575,12 +669,15 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
               content: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // MONTH PICKER
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text("Month",
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text(
+                          "Month",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         SizedBox(
                           height: 120,
                           child: ListWheelScrollView.useDelegate(
@@ -590,6 +687,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                             onSelectedItemChanged: (index) {
                               setDialogState(() {
                                 selectedMonth = index + 1;
+                                // Reset selectedDay if you want:
                                 selectedDay = 1;
                               });
                             },
@@ -604,7 +702,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                                   },
                                   child: Container(
                                     alignment: Alignment.center,
-                                    color: selectedMonth == i + 1
+                                    color: (selectedMonth == i + 1)
                                         ? Colors.purple.shade100
                                         : Colors.transparent,
                                     child: Text(
@@ -624,10 +722,10 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                                       ][i],
                                       style: TextStyle(
                                         fontSize: 16,
-                                        color: selectedMonth == i + 1
+                                        color: (selectedMonth == i + 1)
                                             ? Colors.purple.shade800
                                             : Colors.black,
-                                        fontWeight: selectedMonth == i + 1
+                                        fontWeight: (selectedMonth == i + 1)
                                             ? FontWeight.bold
                                             : FontWeight.normal,
                                       ),
@@ -642,12 +740,15 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                     ),
                   ),
                   const SizedBox(width: 20),
+                  // DAY PICKER
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text("Day",
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text(
+                          "Day",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         SizedBox(
                           height: 120,
                           child: ListWheelScrollView.useDelegate(
@@ -660,8 +761,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                               });
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
-                              children:
-                                  List.generate(monthDays[selectedMonth]!, (i) {
+                              children: List.generate(monthDays[selectedMonth]!, (i) {
                                 return GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
@@ -671,17 +771,17 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                                   },
                                   child: Container(
                                     alignment: Alignment.center,
-                                    color: selectedDay == i + 1
+                                    color: (selectedDay == i + 1)
                                         ? Colors.purple.shade100
                                         : Colors.transparent,
                                     child: Text(
-                                      (i + 1).toString(),
+                                      '${i + 1}',
                                       style: TextStyle(
                                         fontSize: 16,
-                                        color: selectedDay == i + 1
+                                        color: (selectedDay == i + 1)
                                             ? Colors.purple.shade800
                                             : Colors.black,
-                                        fontWeight: selectedDay == i + 1
+                                        fontWeight: (selectedDay == i + 1)
                                             ? FontWeight.bold
                                             : FontWeight.normal,
                                       ),
@@ -704,23 +804,14 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                 ),
                 TextButton(
                   onPressed: () {
+                    // Add the chosen month/day to _selectedDates
+                    final monthNames = [
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ];
+
                     setState(() {
-                      final monthNames = [
-                        'January',
-                        'February',
-                        'March',
-                        'April',
-                        'May',
-                        'June',
-                        'July',
-                        'August',
-                        'September',
-                        'October',
-                        'November',
-                        'December'
-                      ];
-                      _selectedDates
-                          .add("${monthNames[selectedMonth - 1]} $selectedDay");
+                      _selectedDates.add("${monthNames[selectedMonth - 1]} $selectedDay");
                     });
                     Navigator.pop(dialogCtx);
                   },
@@ -733,6 +824,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
       },
     );
   }
+
 
   Widget _buildDaysPerPeriodPicker() {
     return Column(
@@ -809,6 +901,78 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     );
   }
 
+  // --------------------------
+  // CHECKLIST SUPPORT
+  // --------------------------
+  Widget _buildChecklistSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Checklist Items:", style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Column(
+          children: _checklistItems
+              .asMap()
+              .entries
+              .map(
+                (entry) => Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text('- ${entry.value}')),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      _checklistItems.removeAt(entry.key);
+                    });
+                  },
+                ),
+              ],
+            ),
+          )
+              .toList(),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _checklistItemController,
+                decoration: const InputDecoration(
+                  labelText: 'Add sub-task',
+                ),
+                onSubmitted: (val) {
+                  final trimmed = val.trim();
+                  if (trimmed.isNotEmpty) {
+                    setState(() {
+                      _checklistItems.add(trimmed);
+                      _checklistItemController.clear();
+                    });
+                  }
+                },
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Colors.blue),
+              onPressed: () {
+                final text = _checklistItemController.text.trim();
+                if (text.isNotEmpty) {
+                  setState(() {
+                    _checklistItems.add(text);
+                    _checklistItemController.clear();
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --------------------------
+  // REMINDERS
+  // --------------------------
   Widget _buildRemindersSection() {
     return Row(
       children: [
@@ -822,7 +986,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                   controller: _reminderTimeController,
                   decoration: InputDecoration(
                     prefixIcon:
-                        const Icon(Icons.access_time, color: T.purple_1),
+                    const Icon(Icons.access_time, color: T.purple_1),
                     hintText: 'Time',
                     enabledBorder: OutlineInputBorder(
                       borderSide: const BorderSide(color: Colors.grey),
@@ -833,7 +997,7 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     contentPadding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   ),
                   style: const TextStyle(fontSize: 14),
                 ),
@@ -844,10 +1008,10 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                   value: _reminderFrequency,
                   onChanged: _remindersEnabled
                       ? (value) {
-                          setState(() {
-                            _reminderFrequency = value!;
-                          });
-                        }
+                    setState(() {
+                      _reminderFrequency = value!;
+                    });
+                  }
                       : null,
                   items: ['Every day', 'Specific day'].map((freq) {
                     return DropdownMenuItem(value: freq, child: Text(freq));
@@ -872,6 +1036,9 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
     );
   }
 
+  // --------------------------
+  // BUILD
+  // --------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -932,108 +1099,64 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
                 ),
               ),
 
-              // Icon + Color
+              // Icon + Color picking
               _buildSection(
                 title: 'Icon and Color',
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _openIconPicker,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(_selectedIcon,
-                                  size: 40, color: Colors.black),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _selectedIconLabel,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  const Text("Tap to change",
-                                      style: TextStyle(color: Colors.grey)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _openColorPicker,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: _selectedColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _selectedColorLabel,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  const Text("Tap to change",
-                                      style: TextStyle(color: Colors.grey)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                child: _buildIconAndColorPickerSection(),
               ),
 
-              // Evaluation Method
-              // For now we assume only 'Yes/No' is used, but here's an example if you want to expand it:
+              // Evaluation Method: Yes/No or Checklist
               _buildSection(
                 title: 'Evaluation Method',
-                child: ListTile(
-                  leading: Icon(
-                    Icons.toggle_on,
-                    color: _evaluationMethod == 'Yes/No'
-                        ? T.purple_1.withOpacity(0.7)
-                        : Colors.grey,
-                  ),
-                  title: const Text('Yes/No'),
-                  onTap: () {
-                    setState(() {
-                      _evaluationMethod = 'Yes/No';
-                    });
-                  },
-                  selected: _evaluationMethod == 'Yes/No',
-                  selectedTileColor: Colors.grey.shade200,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                child: Column(
+                  children: [
+                    // Yes/No tile
+                    ListTile(
+                      leading: Icon(
+                        Icons.toggle_on,
+                        color: _evaluationMethod == 'Yes/No'
+                            ? T.purple_1.withOpacity(0.7)
+                            : Colors.grey,
+                      ),
+                      title: const Text('Yes/No'),
+                      onTap: () {
+                        setState(() {
+                          _evaluationMethod = 'Yes/No';
+                        });
+                      },
+                      selected: _evaluationMethod == 'Yes/No',
+                      selectedTileColor: Colors.grey.shade200,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    // Checklist tile
+                    ListTile(
+                      leading: Icon(
+                        Icons.checklist,
+                        color: _evaluationMethod == 'Checklist'
+                            ? T.purple_1.withOpacity(0.7)
+                            : Colors.grey,
+                      ),
+                      title: const Text('Checklist'),
+                      onTap: () {
+                        setState(() {
+                          _evaluationMethod = 'Checklist';
+                        });
+                      },
+                      selected: _evaluationMethod == 'Checklist',
+                      selectedTileColor: Colors.grey.shade200,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    // If method is "Checklist", show subtasks
+                    if (_evaluationMethod == 'Checklist')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10.0),
+                        child: _buildChecklistSection(),
+                      ),
+                  ],
                 ),
               ),
 
