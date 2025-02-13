@@ -4,20 +4,19 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:smart_habit_tracker/navigation/main_navigation.dart';
+import 'package:smart_habit_tracker/screens/loading_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
 
 // For Google Sign-In
 import 'package:google_sign_in/google_sign_in.dart';
-
 // For Apple Sign-In
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onToggle;
-
-  const LoginScreen({super.key, required this.onToggle});
+  const LoginScreen({Key? key, required this.onToggle}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _LoginScreenState();
@@ -43,6 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     passwordFocusNode.addListener(_handleFocusChange);
   }
 
+  // Detect keyboard open/close to adjust UI elements
   void _handleFocusChange() {
     if (emailFocusNode.hasFocus || passwordFocusNode.hasFocus) {
       setState(() {
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Logs in the user using email/password
+  /// Logs in the user using email/password.
   Future<void> userLogin() async {
     try {
       email = emailController.text.trim();
@@ -71,9 +71,10 @@ class _LoginScreenState extends State<LoginScreen> {
           .signInWithEmailAndPassword(email: email, password: password);
 
       if (!mounted) return;
+      // Navigate to the LoadingScreen which will then redirect to MainNavigation
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -104,9 +105,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Displays a dialog to reset the password
+  /// Displays a dialog to reset the password.
   Future<void> _showResetPasswordDialog() async {
-    // Pre-fill with whatever is in emailController, or leave it blank
     final TextEditingController resetEmailController =
         TextEditingController(text: emailController.text.trim());
 
@@ -118,9 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Enter your email to receive a password reset link:',
-              ),
+              const Text('Enter your email to receive a password reset link:'),
               const SizedBox(height: 10),
               TextField(
                 controller: resetEmailController,
@@ -163,8 +161,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     }
                   }
                 }
-
-                // Only pop if we are still mounted
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext);
                 }
@@ -177,28 +173,27 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Sign in with Google. If the user doesn't exist, Firebase creates a new one.
+  /// Sign in with Google.
   Future<void> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
-        // The user canceled the sign-in flow
+        // User canceled the sign-in
         return;
       }
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Get the credential
+      // Create credential for Firebase authentication
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase
       final UserCredential userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
 
-      // If it's a new user, create a document in Firestore (optional)
+      // If the user is new, add their info to Firestore
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -209,9 +204,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
+      // Navigate to LoadingScreen after successful sign-in
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -224,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      debugPrint('Google Sign-In general error: $e');
+      debugPrint('Google Sign-In error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Colors.red,
@@ -234,9 +230,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Sign in with Apple (iOS/macOS only). If new, create doc in Firestore.
+  /// Sign in with Apple (iOS/macOS only).
   Future<void> signInWithApple() async {
-    // For Apple sign-in, ensure you have the correct setup on iOS/macOS
     if (!Platform.isIOS && !Platform.isMacOS) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -273,9 +268,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
+      // Navigate to LoadingScreen after successful Apple sign-in
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
       debugPrint('Apple Sign-In Firebase error: $e');
@@ -287,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } catch (e) {
-      debugPrint('Apple Sign-In general error: $e');
+      debugPrint('Apple Sign-In error: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -398,7 +394,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 16.0),
-
                             // PASSWORD
                             SizedBox(
                               width: 305,
@@ -450,7 +445,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 8.0),
-
                             // FORGOT PASSWORD
                             SizedBox(
                               width: 305,
@@ -461,16 +455,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                     onTap: _showResetPasswordDialog,
                                     child: const Text(
                                       'Forgot Password?',
-                                      style: TextStyle(
-                                        color: T.violet_0,
-                                      ),
+                                      style: TextStyle(color: T.violet_0),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 20.0),
-
                             // LOGIN BUTTON
                             SizedBox(
                               width: 315,
@@ -485,8 +476,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 20.0),
-
-                            // GOOGLE + APPLE SIGN-IN
+                            // GOOGLE & APPLE SIGN-IN
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -496,10 +486,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     padding: const EdgeInsets.all(8.0),
                                     decoration: BoxDecoration(
                                       color: Colors.white30,
-                                      border: Border.all(
-                                        color: T.grey_0,
-                                        width: 1,
-                                      ),
+                                      border:
+                                          Border.all(color: T.grey_0, width: 1),
                                       borderRadius: BorderRadius.circular(12.0),
                                     ),
                                     child: SizedBox(
@@ -521,9 +509,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       decoration: BoxDecoration(
                                         color: Colors.white30,
                                         border: Border.all(
-                                          color: T.grey_0,
-                                          width: 1,
-                                        ),
+                                            color: T.grey_0, width: 1),
                                         borderRadius:
                                             BorderRadius.circular(12.0),
                                       ),
@@ -540,7 +526,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             const SizedBox(height: 16.0),
-
                             // TERMS / PRIVACY REMINDER
                             AnimatedOpacity(
                               opacity: isKeyboardOpen ? 0.0 : 1.0,
@@ -556,9 +541,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         .copyWith(color: T.grey_1),
                                     children: [
                                       const TextSpan(
-                                        text:
-                                            'By logging, you are agreeing with our\n',
-                                      ),
+                                          text:
+                                              'By logging, you are agreeing with our\n'),
                                       TextSpan(
                                         text: 'Terms of Use',
                                         style: T.captionSmall.copyWith(
@@ -595,8 +579,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-
-            // FOOTER
+            // FOOTER: Switch to Register
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),

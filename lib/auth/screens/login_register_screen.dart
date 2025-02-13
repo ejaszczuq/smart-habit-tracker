@@ -4,7 +4,7 @@ import 'package:smart_habit_tracker/auth/screens/login_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
-  const LoginRegisterScreen({super.key});
+  const LoginRegisterScreen({Key? key}) : super(key: key);
 
   @override
   State<LoginRegisterScreen> createState() => _LoginRegisterScreenState();
@@ -13,6 +13,7 @@ class LoginRegisterScreen extends StatefulWidget {
 class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
   bool isLogin = true;
 
+  // Toggle between login and register forms
   void toggle() {
     setState(() {
       isLogin = !isLogin;
@@ -30,6 +31,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Toggle button for switching forms
           Padding(
             padding:
                 const EdgeInsets.only(bottom: 30.0, left: 16.0, right: 16.0),
@@ -91,18 +93,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
               ),
             ),
           ),
-
-          // Dynamiczne przełączanie widgetów
+          // Switch between LoginScreen and RegisterScreen
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
               child: isLogin
-                  ? LoginScreen(
-                      onToggle: toggle,
-                    )
-                  : RegisterScreen(
-                      onToggle: toggle,
-                    ),
+                  ? LoginScreen(onToggle: toggle)
+                  : RegisterScreen(onToggle: toggle),
             ),
           ),
         ],
