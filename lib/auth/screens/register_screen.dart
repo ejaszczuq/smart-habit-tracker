@@ -3,23 +3,17 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:smart_habit_tracker/navigation/main_navigation.dart';
+import 'package:smart_habit_tracker/screens/loading_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
-
-// Firebase + Firestore
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-// Google Sign-In
 import 'package:google_sign_in/google_sign_in.dart';
-
-// Apple Sign-In
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class RegisterScreen extends StatefulWidget {
   final VoidCallback onToggle;
-
-  const RegisterScreen({super.key, required this.onToggle});
+  const RegisterScreen({Key? key, required this.onToggle}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _RegisterScreenState();
@@ -53,6 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     confirmPasswordFocusNode.addListener(_handleFocusChange);
   }
 
+  // Detect keyboard open/close state to adjust UI
   void _handleFocusChange() {
     if (nameFocusNode.hasFocus ||
         emailFocusNode.hasFocus ||
@@ -90,6 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  /// Registers a new user using email and password.
   Future<void> registration() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -132,9 +128,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
+      // Navigate to LoadingScreen which then redirects to MainNavigation
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
       String errorMessage = '';
@@ -170,6 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  /// Sign up using a Google account.
   Future<void> signUpWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
@@ -199,7 +197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
       debugPrint('Google Sign-Up Firebase error: $e');
@@ -211,7 +209,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } catch (e) {
-      debugPrint('Google Sign-Up general error: $e');
+      debugPrint('Google Sign-Up error: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -222,6 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  /// Sign up using an Apple account (iOS/macOS only).
   Future<void> signUpWithApple() async {
     if (!Platform.isIOS && !Platform.isMacOS) {
       if (!mounted) return;
@@ -261,7 +260,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainNavigation()),
+        MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
       debugPrint('Apple Sign-Up Firebase error: $e');
@@ -284,6 +283,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  // Helper method to build input decoration for text fields.
   InputDecoration _buildInputDecoration({
     required String label,
     required String hint,
@@ -334,6 +334,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
+            // MAIN CONTENT with the registration form
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -380,7 +381,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Please enter your email';
                                 }
-
                                 final emailRegex =
                                     RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                                 if (!emailRegex.hasMatch(value.trim())) {
@@ -422,7 +422,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 if (value.length < 6) {
                                   return 'Password must be at least 6 characters long';
                                 }
-
                                 final passwordRegex = RegExp(
                                     r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$');
                                 if (!passwordRegex.hasMatch(value)) {
@@ -562,10 +561,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.white30,
-                                    border: Border.all(
-                                      color: T.grey_0,
-                                      width: 1,
-                                    ),
+                                    border:
+                                        Border.all(color: T.grey_0, width: 1),
                                     borderRadius: BorderRadius.circular(16.0),
                                     boxShadow: [
                                       BoxShadow(
@@ -617,10 +614,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: Colors.white30,
-                                      border: Border.all(
-                                        color: T.grey_0,
-                                        width: 1,
-                                      ),
+                                      border:
+                                          Border.all(color: T.grey_0, width: 1),
                                       borderRadius: BorderRadius.circular(16.0),
                                       boxShadow: [
                                         BoxShadow(
@@ -670,6 +665,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
+            // FOOTER: Switch to Login
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),
