@@ -47,19 +47,19 @@ class HabitsScreenState extends State<HabitsScreen> {
     return Scaffold(
       appBar: AppBar(
         // AppBar with gradient background using typography colors
-        title: Text('Habits Overview', style: T.h3.copyWith(color: T.white_0)),
+        title: Text('Habits Overview', style: T.h3),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
-            gradient: T.gradient_1,
+            color: T.white_0,
           ),
         ),
         actions: [
           // Gear icon in the top-right corner
           IconButton(
-            icon: const Icon(Icons.settings, color: T.white_0),
+            icon: const Icon(Icons.settings, color: T.violet_0),
             onPressed: () => _showSettingsDialog(),
           ),
         ],

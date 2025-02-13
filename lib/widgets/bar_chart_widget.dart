@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
 class BarChartWidget extends StatelessWidget {
   final Map<String, int> data;
@@ -18,7 +19,7 @@ class BarChartWidget extends StatelessWidget {
           barRods: [
             BarChartRodData(
               toY: value.toDouble(),
-              color: Colors.blueAccent.withOpacity(0.5),
+              color: T.purple_2.withOpacity(0.4),
               width: 16,
               borderRadius: BorderRadius.circular(4),
               backDrawRodData: BackgroundBarChartRodData(
@@ -68,7 +69,7 @@ class BarChartWidget extends StatelessWidget {
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
             // Use a getTooltipColor callback that accepts a single parameter.
-            getTooltipColor: (BarChartGroupData group) => Colors.blueAccent,
+            getTooltipColor: (BarChartGroupData group) => T.violet_2,
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
                 rod.toY.toStringAsFixed(0),
