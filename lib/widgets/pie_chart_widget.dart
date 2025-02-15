@@ -13,9 +13,9 @@ class PieChartWidget extends StatelessWidget {
     data.forEach((label, value) {
       Color color;
       if (label == "done") {
-        color = Colors.green.withOpacity(0.5);
+        color = const Color.fromARGB(255, 75, 197, 79).withOpacity(0.5);
       } else if (label == "failed") {
-        color = Colors.yellow.withOpacity(0.5);
+        color = const Color.fromARGB(255, 255, 59, 59).withOpacity(0.5);
       } else {
         color = Colors.grey.withOpacity(0.5);
       }

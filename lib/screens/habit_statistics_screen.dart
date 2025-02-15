@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:smart_habit_tracker/typography.dart';
 import '../widgets/bar_chart_widget.dart';
 import '../widgets/pie_chart_widget.dart';
 
@@ -15,7 +16,7 @@ class HabitStatisticsScreen extends StatefulWidget {
 }
 
 class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
-  // Chart modes
+  // Chart mode: "monthly", "year", or "weeklyYear"
   String barChartMode = "monthly";
   late DateTime displayedMonth;
 
@@ -26,7 +27,7 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
     displayedMonth = DateTime(now.year, now.month, 1);
   }
 
-  /// Stream: reads .collection('completion') -> doc id = date string -> 'completed'
+  /// Stream: Reads the 'completion' collection and returns a list of completion maps.
   Stream<List<Map<String, dynamic>>> watchCompletionsForHabit(
       Map<String, dynamic> habitData) {
     final user = FirebaseAuth.instance.currentUser;
@@ -45,7 +46,6 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
       for (var doc in snapshot.docs) {
         final dateParsed = DateTime.tryParse(doc.id);
         if (dateParsed == null) continue;
-
         final data = doc.data();
         final done = data['completed'] ?? false;
         comps.add({
@@ -58,41 +58,94 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
     });
   }
 
-  /// Current streak: consecutive days from today backwards.
+  /// Calculate current streak: consecutive days completed from today backwards.
   int calculateCurrentStreak(List<Map<String, dynamic>> comps) {
     int streak = 0;
     final now = DateTime.now();
+    final dateFormatter = DateFormat('yyyy-MM-dd');
+
+    final completedDays = comps
+        .where((comp) => comp['completed'] == true)
+        .map((comp) => dateFormatter.format(comp['date'] as DateTime))
+        .toSet();
 
     for (int i = 0; i < 365; i++) {
-      final day = DateTime(now.year, now.month, now.day)
-          .subtract(Duration(days: i));
-      bool found = comps.any((element) {
-        final d = element['date'] as DateTime;
-        return d.year == day.year &&
-            d.month == day.month &&
-            d.day == day.day &&
-            element['completed'] == true;
-      });
-      if (found) {
+      final day =
+          DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+      final dayStr = dateFormatter.format(day);
+      if (completedDays.contains(dayStr)) {
         streak++;
       } else {
         break;
       }
     }
+
     return streak;
   }
 
-  /// Count how many completions from [start] to [end] inclusive.
+  /// Styled widget for the current streak display.
+  Widget buildCurrentStreak(int streak) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF9B00FF), Color(0xFF5E00E7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purpleAccent.withOpacity(0.5),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.local_fire_department,
+              color: Colors.orangeAccent, size: 32),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                "$streak ${streak == 1 ? "Day" : "Days"}",
+                style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                streak > 30
+                    ? "Amazing! Keep going!"
+                    : "You're on fire! Keep it up!",
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+            ],
+          ),
+          if (streak > 30)
+            const Padding(
+              padding: EdgeInsets.only(left: 10),
+              child: Icon(Icons.emoji_events,
+                  color: Colors.yellowAccent, size: 32),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Count completions in the period from [start] to [end] (inclusive).
   int countCompletionsInPeriod(
-      List<Map<String, dynamic>> comps,
-      DateTime start,
-      DateTime end,
-      ) {
+      List<Map<String, dynamic>> comps, DateTime start, DateTime end) {
     int count = 0;
     final periodStart = DateTime(start.year, start.month, start.day);
     final periodEnd =
-    DateTime(end.year, end.month, end.day).add(const Duration(days: 1));
-
+        DateTime(end.year, end.month, end.day).add(const Duration(days: 1));
     for (var comp in comps) {
       final d = comp['date'] as DateTime;
       final isCompleted = comp['completed'] == true;
@@ -105,14 +158,11 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
     return count;
   }
 
-  /// Bar chart data: either monthly, yearly, or weekly distribution in the year
+  /// Bar chart data: returns a map for different chart modes.
   Map<String, int> getBarChartData(
-      List<Map<String, dynamic>> comps,
-      Map<String, dynamic> habitData,
-      ) {
+      List<Map<String, dynamic>> comps, Map<String, dynamic> habitData) {
     final data = <String, int>{};
     final now = DateTime.now();
-
     if (barChartMode == "monthly") {
       for (int month = 1; month <= 12; month++) {
         final first = DateTime(now.year, month, 1);
@@ -157,19 +207,17 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
       data["Sat"] = map[6]!;
       data["Sun"] = map[7]!;
     }
-
     return data;
   }
 
-  /// Builds a simple month overview with checks for each day that was done.
+  /// Styled widget for the month calendar with circular day indicators and a badge for completed days.
   Widget buildMonthCalendar(List<Map<String, dynamic>> comps) {
     final daysInMonth =
         DateTime(displayedMonth.year, displayedMonth.month + 1, 0).day;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header
+        // Header with navigation arrows and month/year display.
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -189,7 +237,8 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
               children: [
                 Text(
                   DateFormat('MMMM').format(displayedMonth),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   displayedMonth.year.toString(),
@@ -212,17 +261,16 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        // Days row
+        // Horizontal list of days with circular indicators.
         SizedBox(
-          height: 80,
+          height: 60,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: daysInMonth,
             itemBuilder: (context, index) {
               final day = index + 1;
               final currentDay =
-              DateTime(displayedMonth.year, displayedMonth.month, day);
-
+                  DateTime(displayedMonth.year, displayedMonth.month, day);
               bool done = comps.any((element) {
                 final d = element['date'] as DateTime;
                 final isDone = element['completed'] == true;
@@ -231,18 +279,66 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
                     d.day == currentDay.day &&
                     isDone;
               });
-
               return Container(
-                width: 40,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    done
-                        ? const Icon(Icons.check, color: Colors.green, size: 16)
-                        : const SizedBox(height: 16),
-                    const SizedBox(height: 4),
-                    Text(day.toString()),
+                    // Main circular indicator with the day number.
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            done ? Colors.green.withOpacity(0.7) : Colors.white,
+                        border: done
+                            ? null
+                            : Border.all(color: Colors.grey.shade300, width: 1),
+                        boxShadow: done
+                            ? [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.4),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                )
+                              ]
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        day.toString(),
+                        style: TextStyle(
+                          color: done ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // Small badge for completed day.
+                    if (done)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                          ),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.green,
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               );
@@ -253,9 +349,8 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
     );
   }
 
-  /// Pie chart data: done vs. failed from creation date to today
+  /// Pie chart data: returns done vs. failed counts from habit creation to today.
   Map<String, double> getPieChartData(List<Map<String, dynamic>> comps) {
-    // Start date
     final now = DateTime.now();
     final habitData = widget.habit;
     DateTime start = now;
@@ -268,14 +363,12 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
     } else if (comps.isNotEmpty) {
       start = comps.first['date'];
     }
-
     final end = DateTime.now();
     final totalDays = end.difference(start).inDays + 1;
     if (totalDays <= 0) {
       return {"done": 0, "failed": 0};
     }
-
-    // Count unique completed days
+    // Count unique completed days.
     final completedDays = <String>{};
     for (var c in comps) {
       if (c['completed'] == true) {
@@ -283,15 +376,82 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
         completedDays.add(dateStr);
       }
     }
-
     int doneCount = completedDays.length;
     if (doneCount > totalDays) doneCount = totalDays;
-
     final failedCount = totalDays - doneCount;
     return {
       "done": doneCount.toDouble(),
       "failed": failedCount.toDouble(),
     };
+  }
+
+  /// Builds the styled completions section as a vertical list.
+  Widget buildCompletionsSection({
+    required int completionsThisMonth,
+    required int completionsThisYear,
+    required int totalCompletions,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            blurRadius: 6,
+            spreadRadius: 2,
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.track_changes, color: Colors.deepPurple),
+            title: const Text(
+              "This Month",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            trailing: Text(
+              completionsThisMonth.toString(),
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+          ),
+          const Divider(),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading:
+                const Icon(Icons.history_toggle_off, color: Colors.deepPurple),
+            title: const Text(
+              "This Year",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            trailing: Text(
+              completionsThisYear.toString(),
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+          ),
+          const Divider(),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading:
+                const Icon(Icons.check_circle_outline, color: Colors.green),
+            title: const Text(
+              "Total",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            trailing: Text(
+              totalCompletions.toString(),
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -329,88 +489,72 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
           builder: (context, snapshot) {
             final comps = snapshot.data ?? [];
 
+            // Calculate completions for different periods.
+            final int completionsThisMonth = countCompletionsInPeriod(
+              comps,
+              DateTime(DateTime.now().year, DateTime.now().month, 1),
+              DateTime.now(),
+            );
+            final int completionsThisYear = countCompletionsInPeriod(
+              comps,
+              DateTime(DateTime.now().year, 1, 1),
+              DateTime.now(),
+            );
+            final int totalCompletions =
+                comps.where((e) => e['completed'] == true).length;
+
             return Scaffold(
               appBar: AppBar(
+                backgroundColor: Colors.white, // Biały pasek
+                iconTheme: const IconThemeData(
+                    color: Colors.black), // Czarna strzałka powrotu
+                titleTextStyle: T.h3,
                 title: Text(habitData['name'] ?? 'Habit Statistics'),
+                elevation: 0, // Opcjonalnie: usuwa cień pod AppBar
               ),
               body: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Current streak
+                    // Current Streak section with styled widget.
                     const Text(
                       "Current Streak",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      "${calculateCurrentStreak(comps)} days",
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    buildCurrentStreak(calculateCurrentStreak(comps)),
                     const SizedBox(height: 16),
 
-                    // Completions summary
+                    // Completions section redesigned as a vertical list.
                     const Text(
                       "Completions",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Column(
-                          children: [
-                            const Text("This Month",
-                                style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text(
-                              "${countCompletionsInPeriod(
-                                comps,
-                                DateTime(DateTime.now().year, DateTime.now().month, 1),
-                                DateTime.now(),
-                              )}",
-                            ),
-                          ],
-                        ),
-                        Column(
-                          children: [
-                            const Text("This Year",
-                                style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text(
-                              "${countCompletionsInPeriod(
-                                comps,
-                                DateTime(DateTime.now().year, 1, 1),
-                                DateTime.now(),
-                              )}",
-                            ),
-                          ],
-                        ),
-                        Column(
-                          children: [
-                            const Text("Total",
-                                style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text(
-                              "${comps.where((e) => e['completed'] == true).length}",
-                            ),
-                          ],
-                        ),
-                      ],
+                    buildCompletionsSection(
+                      completionsThisMonth: completionsThisMonth,
+                      completionsThisYear: completionsThisYear,
+                      totalCompletions: totalCompletions,
                     ),
                     const SizedBox(height: 16),
 
-                    // Month calendar
-                    const Text(
-                      "Calendar",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    buildMonthCalendar(comps),
-                    const SizedBox(height: 16),
+                    // const Text(
+                    //   "Calendar",
+                    //   style:
+                    //       TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    // ),
+                    // const SizedBox(height: 8),
+                    // buildMonthCalendar(comps),
+                    // const SizedBox(height: 16),
 
-                    // Bar chart
+                    // Bar Chart section.
                     const Text(
                       "Bar Chart",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -450,10 +594,11 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Pie chart
+                    // Pie Chart section.
                     const Text(
                       "Pie Chart (Done / Failed)",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     SizedBox(
