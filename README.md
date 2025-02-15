@@ -2,25 +2,36 @@
 
 ## Project Description
 
-**Smart Habit Tracker** is a mobile application built with Flutter that helps users create and maintain positive habits. With its intuitive user interface and advanced features, the app enables you to track progress, set reminders, and analyze habit statistics to achieve your personal goals.
+**Smart Habit Tracker** is a mobile application built with Flutter that helps users create and maintain positive habits. With its intuitive user interface and advanced features, the app enables you to track progress, set reminders (be added in the future), and analyze habit statistics to achieve your personal goals.
+
+[Figma](https://www.figma.com/design/FaGwjBrR63uEE1yxaH2D4A/smart-habit-tracker?node-id=2-21086&p=f)
 
 ## Screenshots
 
 Here are some screenshots of the app:
 
-### Login / Register screens
+<details>
+<summary>Login / Register screens</summary>
 
 ![Login Screen](assets/screenshots/login_screen.png)
 ![Register Screen](assets/screenshots/register_screen.png)
 
-### 📌 Home Screen
+</details>
+
+<details>
+<summary>📌 Home Screen</summary>
 
 ![Home Screen](assets/screenshots/home_screen.png)
 ![Home Screen (without habits)](assets/screenshots/home_screen_none_data.png)
 
-### 📊 Habit Statistics
+</details>
+
+<details>
+<summary>📊 Habit Statistics</summary>
 
 ![Habit Statistics](assets/screenshots/habit_statistics.png)
+
+</details>
 
 ## Features
 
@@ -35,16 +46,16 @@ Here are some screenshots of the app:
 To run the project locally, follow these steps:
 
 1. **Clone the Repository:**
-   git clone https://github.com/ejaszczuq/smart-habit-tracker.git
-   cd smart-habit-tracker
+```git clone https://github.com/ejaszczuq/smart-habit-tracker.git```
+```cd smart-habit-tracker```
 
 2. **Install Dependencies: Ensure you have Flutter (version 2.0.0 or higher) installed. Then run:**
-   flutter pub get
+   ```flutter pub get```
 
 3. **Run the App: Connect your device or start an emulator, then run:**
-   flutter run
+   ```flutter run```
 
-## Features
+## Requirements
 
 -  Flutter SDK: Version 2.0.0 or higher
 -  Dart: Version 2.12.0 or higher
@@ -55,5 +66,5 @@ To run the project locally, follow these steps:
 
 ## Authors
 
--  ejaszczuq
--  M-44ks
+-  [ejaszczuq](https://github.com/ejaszczuq)
+-  [M-44ks](https://github.com/M-44ks)
