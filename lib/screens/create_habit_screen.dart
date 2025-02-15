@@ -62,17 +62,17 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final TextEditingController _descriptionController = TextEditingController();
 
   // Icon / color picking
-  String selectedIconLabel = 'Running';
+  String selectedIconLabel = '';
   IconData? selectedIcon;
-  String selectedColorLabel = 'Violet';
-  Color? selectedColor = T.violet_2;
+  String selectedColorLabel = '';
+  Color? selectedColor; // remains null initially
 
   // Evaluation method: 'Yes/No' or 'Checklist'
   String _evaluationMethod = '';
 
-  // Checklist items
+  // Checklist items (only adding and removing; checking off will be done elsewhere)
   final TextEditingController _checklistItemController =
-  TextEditingController();
+      TextEditingController();
   final List<String> _checklistItems = [];
 
   // Frequency
@@ -80,8 +80,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final Set<String> _selectedDaysOfWeek = {};
   final Set<int> _selectedDaysOfMonth = {};
   final List<String> _selectedDates = [];
-  final TextEditingController _daysPerPeriodController = TextEditingController();
-  final TextEditingController _repeatIntervalController = TextEditingController();
+  final TextEditingController _daysPerPeriodController =
+      TextEditingController();
+  final TextEditingController _repeatIntervalController =
+      TextEditingController();
   String? _selectedPeriod;
 
   // Reminders
@@ -113,13 +115,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       'color': selectedColorLabel,
       'evaluationMethod': _evaluationMethod,
 
-      // If it's a Checklist, store subTasks
+      // If it's a Checklist, store subTasks (without status)
       if (_evaluationMethod == 'Checklist') 'subTasks': _checklistItems,
 
       'frequency': {
         'type': freqType,
-        'daysOfWeek':
-        _selectedDaysOfWeek.isNotEmpty ? _selectedDaysOfWeek.toList() : null,
+        'daysOfWeek': _selectedDaysOfWeek.isNotEmpty
+            ? _selectedDaysOfWeek.toList()
+            : null,
         'daysOfMonth': _selectedDaysOfMonth.isNotEmpty
             ? _selectedDaysOfMonth.toList()
             : null,
@@ -207,11 +210,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   Widget _buildIconAndColorPickerSection() {
     return Row(
       children: [
+        // Icon Picker
         Expanded(
           child: GestureDetector(
             onTap: _openIconPicker,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              height: 70,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12), // Adjust padding
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -226,18 +232,41 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(selectedIcon ?? Icons.run_circle,
-                      size: 40, color: Colors.black),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey.shade200,
+                    ),
+                    child: Icon(
+                      selectedIcon ?? Icons.help_outline,
+                      size: 24,
+                      color: selectedIcon == null ? Colors.grey : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start, // Align text to left
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        selectedIconLabel,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        selectedIconLabel.isNotEmpty
+                            ? selectedIconLabel
+                            : "Pick an icon",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color:
+                              selectedIcon == null ? Colors.grey : Colors.black,
+                        ),
                       ),
-                      const Text("Icon", style: TextStyle(color: Colors.grey)),
+                      Text(
+                        "Icon",
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                     ],
                   ),
                 ],
@@ -246,11 +275,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           ),
         ),
         const SizedBox(width: 16),
+
+        // Color Picker
         Expanded(
           child: GestureDetector(
             onTap: _openColorPicker,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              height: 70,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -265,24 +297,39 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: selectedColor ?? Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(12),
+                      color: selectedColor ?? Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    child: selectedColor == null
+                        ? const Icon(Icons.palette, color: Colors.white)
+                        : null,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        selectedColorLabel,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        selectedColorLabel.isNotEmpty
+                            ? selectedColorLabel
+                            : "Pick a color",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: selectedColor == null
+                              ? Colors.grey
+                              : Colors.black,
+                        ),
                       ),
-                      const Text("Color", style: TextStyle(color: Colors.grey)),
+                      Text(
+                        "Color",
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                     ],
                   ),
                 ],
@@ -296,11 +343,22 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
 
   void _openIconPicker() {
     final List<Map<String, dynamic>> icons = [
-      {'icon': Icons.run_circle, 'label': 'Running'},
+      {'icon': Icons.directions_run, 'label': 'Running'},
       {'icon': Icons.directions_walk, 'label': 'Walking'},
       {'icon': Icons.fitness_center, 'label': 'Fitness'},
-      {'icon': Icons.sports, 'label': 'Sports'},
-      {'icon': Icons.directions_bike_sharp, 'label': 'Cycling'},
+      {'icon': Icons.sports_basketball, 'label': 'Basketball'},
+      {'icon': Icons.directions_bike, 'label': 'Cycling'},
+      {'icon': Icons.spa, 'label': 'Meditation'},
+      {'icon': Icons.self_improvement, 'label': 'Self-improvement'},
+      {'icon': Icons.book, 'label': 'Reading'},
+      {'icon': Icons.music_note, 'label': 'Music'},
+      {'icon': Icons.code, 'label': 'Coding'},
+      {'icon': Icons.work, 'label': 'Work'},
+      {'icon': Icons.brush, 'label': 'Art'},
+      {'icon': Icons.food_bank, 'label': 'Healthy Eating'},
+      {'icon': Icons.water, 'label': 'Drinking Water'},
+      {'icon': Icons.local_florist, 'label': 'Gardening'},
+      {'icon': Icons.nightlight_round, 'label': 'Sleep'},
     ];
 
     showDialog(
@@ -308,21 +366,41 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text("Pick an Icon"),
-          content: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: icons.map((iconData) {
-              return IconButton(
-                icon: Icon(iconData['icon'], size: 30),
-                onPressed: () {
-                  setState(() {
-                    selectedIcon = iconData['icon'];
-                    selectedIconLabel = iconData['label'];
-                  });
-                  Navigator.of(context).pop();
-                },
-              );
-            }).toList(),
+          content: SingleChildScrollView(
+            child: Wrap(
+              spacing: 15,
+              runSpacing: 15,
+              children: icons.map((iconData) {
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedIcon = iconData['icon'];
+                      selectedIconLabel = iconData['label'];
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade200,
+                        ),
+                        child: Icon(iconData['icon'],
+                            size: 32, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        iconData['label'],
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         );
       },
@@ -388,7 +466,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   controller: _reminderTimeController,
                   decoration: InputDecoration(
                     prefixIcon:
-                    const Icon(Icons.access_time, color: T.purple_1),
+                        const Icon(Icons.access_time, color: T.purple_1),
                     hintText: 'Time',
                     enabledBorder: OutlineInputBorder(
                       borderSide: const BorderSide(color: Colors.grey),
@@ -398,8 +476,8 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                       borderSide: const BorderSide(color: T.violet_0),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 8, horizontal: 12),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   ),
                   style: const TextStyle(fontSize: 14),
                 ),
@@ -410,14 +488,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   value: _reminderFrequency,
                   onChanged: _remindersEnabled
                       ? (value) {
-                    setState(() {
-                      _reminderFrequency = value!;
-                    });
-                  }
+                          setState(() {
+                            _reminderFrequency = value!;
+                          });
+                        }
                       : null,
                   items: ['Every day', 'Specific day']
                       .map((freq) =>
-                      DropdownMenuItem(value: freq, child: Text(freq)))
+                          DropdownMenuItem(value: freq, child: Text(freq)))
                       .toList(),
                   isExpanded: true,
                 ),
@@ -442,7 +520,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   // -----------------------------------
   // FREQUENCY
   // -----------------------------------
-
   Widget _buildFrequencySection() {
     final List<String> frequencies = [
       "Every day",
@@ -468,10 +545,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           items: frequencies
               .map(
                 (freq) => DropdownMenuItem(
-              value: freq,
-              child: Text(freq),
-            ),
-          )
+                  value: freq,
+                  child: Text(freq),
+                ),
+              )
               .toList(),
         ),
         if (_selectedFrequency != null)
@@ -507,25 +584,26 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           spacing: 8,
           children: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
               .map((day) => FilterChip(
-            label: Text(day),
-            selected: _selectedDaysOfWeek.contains(day),
-            selectedColor: T.violet_2.withOpacity(0.2),
-            side: MaterialStateBorderSide.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) {
-                return const BorderSide(color: T.violet_2, width: 1.5);
-              }
-              return BorderSide(color: Colors.grey.shade300, width: 1.0);
-            }),
-            onSelected: (selected) {
-              setState(() {
-                if (selected) {
-                  _selectedDaysOfWeek.add(day);
-                } else {
-                  _selectedDaysOfWeek.remove(day);
-                }
-              });
-            },
-          ))
+                    label: Text(day),
+                    selected: _selectedDaysOfWeek.contains(day),
+                    selectedColor: T.violet_2.withOpacity(0.2),
+                    side: MaterialStateBorderSide.resolveWith((states) {
+                      if (states.contains(MaterialState.selected)) {
+                        return const BorderSide(color: T.violet_2, width: 1.5);
+                      }
+                      return BorderSide(
+                          color: Colors.grey.shade300, width: 1.0);
+                    }),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedDaysOfWeek.add(day);
+                        } else {
+                          _selectedDaysOfWeek.remove(day);
+                        }
+                      });
+                    },
+                  ))
               .toList(),
         ),
       ],
@@ -542,25 +620,26 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           spacing: 8,
           children: List.generate(31, (index) => index + 1)
               .map((day) => FilterChip(
-            label: Text('$day'),
-            selected: _selectedDaysOfMonth.contains(day),
-            selectedColor: T.violet_2.withOpacity(0.2),
-            side: MaterialStateBorderSide.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) {
-                return const BorderSide(color: T.violet_2, width: 1.5);
-              }
-              return BorderSide(color: Colors.grey.shade300, width: 1.0);
-            }),
-            onSelected: (selected) {
-              setState(() {
-                if (selected) {
-                  _selectedDaysOfMonth.add(day);
-                } else {
-                  _selectedDaysOfMonth.remove(day);
-                }
-              });
-            },
-          ))
+                    label: Text('$day'),
+                    selected: _selectedDaysOfMonth.contains(day),
+                    selectedColor: T.violet_2.withOpacity(0.2),
+                    side: MaterialStateBorderSide.resolveWith((states) {
+                      if (states.contains(MaterialState.selected)) {
+                        return const BorderSide(color: T.violet_2, width: 1.5);
+                      }
+                      return BorderSide(
+                          color: Colors.grey.shade300, width: 1.0);
+                    }),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedDaysOfMonth.add(day);
+                        } else {
+                          _selectedDaysOfMonth.remove(day);
+                        }
+                      });
+                    },
+                  ))
               .toList(),
         ),
       ],
@@ -634,8 +713,18 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                                         : Colors.transparent,
                                     child: Text(
                                       [
-                                        'January','February','March','April','May','June',
-                                        'July','August','September','October','November','December'
+                                        'January',
+                                        'February',
+                                        'March',
+                                        'April',
+                                        'May',
+                                        'June',
+                                        'July',
+                                        'August',
+                                        'September',
+                                        'October',
+                                        'November',
+                                        'December'
                                       ][i],
                                       style: TextStyle(
                                         fontSize: 16,
@@ -676,7 +765,8 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                               });
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
-                              children: List.generate(monthDays[selectedMonth]!, (i) {
+                              children:
+                                  List.generate(monthDays[selectedMonth]!, (i) {
                                 return GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
@@ -721,10 +811,21 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   onPressed: () {
                     setState(() {
                       final monthNames = [
-                        'January','February','March','April','May','June',
-                        'July','August','September','October','November','December'
+                        'January',
+                        'February',
+                        'March',
+                        'April',
+                        'May',
+                        'June',
+                        'July',
+                        'August',
+                        'September',
+                        'October',
+                        'November',
+                        'December'
                       ];
-                      _selectedDates.add("${monthNames[selectedMonth - 1]} $selectedDay");
+                      _selectedDates
+                          .add("${monthNames[selectedMonth - 1]} $selectedDay");
                     });
                     Navigator.pop(dialogContext);
                   },
@@ -847,7 +948,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   Widget _buildEvaluationMethodSection() {
     final List<Map<String, dynamic>> evaluationMethods = [
       {'icon': Icons.toggle_on, 'label': 'Yes/No'},
-      {'icon': Icons.checklist, 'label': 'Checklist'}, // Re-added checklist
+      {'icon': Icons.checklist, 'label': 'Checklist'},
     ];
 
     return Column(
@@ -874,38 +975,42 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             ),
           );
         }).toList(),
-        // If 'Checklist', show the sub-task fields
+        // If 'Checklist', show the sub-task fields (without habit complete status)
         if (_evaluationMethod == 'Checklist') _buildChecklistFields(),
       ],
     );
   }
 
-  /// Build UI for adding subtasks if evaluationMethod == 'Checklist'
+  /// Build UI for adding sub-tasks if evaluationMethod == 'Checklist'
   Widget _buildChecklistFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Text(
+          "Checklist items:",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
-        const Text("Checklist items:", style: TextStyle(fontWeight: FontWeight.bold)),
+        // List of subtasks (displayed as list tiles with delete button)
         Column(
-          children: _checklistItems
-              .asMap()
-              .entries
-              .map((entry) => Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(child: Text('- ${entry.value}')),
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () {
-                  setState(() {
-                    _checklistItems.removeAt(entry.key);
-                  });
-                },
+          children: _checklistItems.asMap().entries.map((entry) {
+            int index = entry.key;
+            String task = entry.value;
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: ListTile(
+                title: Text(task),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: T.grey_1),
+                  onPressed: () {
+                    setState(() {
+                      _checklistItems.removeAt(index);
+                    });
+                  },
+                ),
               ),
-            ],
-          ))
-              .toList(),
+            );
+          }).toList(),
         ),
         const SizedBox(height: 8),
         Row(
@@ -928,7 +1033,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.add_circle, color: Colors.blue),
+              icon: const Icon(Icons.add_circle, color: T.purple_1),
               onPressed: () {
                 final text = _checklistItemController.text.trim();
                 if (text.isNotEmpty) {
@@ -989,11 +1094,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                         prefixIcon: Icon(Icons.text_format, color: T.purple_0),
                         enabledBorder: UnderlineInputBorder(
                           borderSide:
-                          BorderSide(color: Colors.grey, width: 0.5),
+                              BorderSide(color: Colors.grey, width: 0.5),
                         ),
                         focusedBorder: UnderlineInputBorder(
-                          borderSide:
-                          BorderSide(color: T.violet_0, width: 0.5),
+                          borderSide: BorderSide(color: T.violet_0, width: 0.5),
                         ),
                       ),
                     ),
@@ -1005,11 +1109,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                         prefixIcon: Icon(Icons.notes, color: T.violet_0),
                         enabledBorder: UnderlineInputBorder(
                           borderSide:
-                          BorderSide(color: Colors.grey, width: 0.5),
+                              BorderSide(color: Colors.grey, width: 0.5),
                         ),
                         focusedBorder: UnderlineInputBorder(
-                          borderSide:
-                          BorderSide(color: T.violet_0, width: 0.5),
+                          borderSide: BorderSide(color: T.violet_0, width: 0.5),
                         ),
                       ),
                     ),

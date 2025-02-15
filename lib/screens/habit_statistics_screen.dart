@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:smart_habit_tracker/typography.dart';
 import '../widgets/bar_chart_widget.dart';
 import '../widgets/pie_chart_widget.dart';
 
@@ -61,22 +62,24 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
   int calculateCurrentStreak(List<Map<String, dynamic>> comps) {
     int streak = 0;
     final now = DateTime.now();
+    final dateFormatter = DateFormat('yyyy-MM-dd');
+
+    final completedDays = comps
+        .where((comp) => comp['completed'] == true)
+        .map((comp) => dateFormatter.format(comp['date'] as DateTime))
+        .toSet();
+
     for (int i = 0; i < 365; i++) {
       final day =
           DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
-      bool found = comps.any((element) {
-        final d = element['date'] as DateTime;
-        return d.year == day.year &&
-            d.month == day.month &&
-            d.day == day.day &&
-            element['completed'] == true;
-      });
-      if (found) {
+      final dayStr = dateFormatter.format(day);
+      if (completedDays.contains(dayStr)) {
         streak++;
       } else {
         break;
       }
     }
+
     return streak;
   }
 
@@ -502,7 +505,12 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
 
             return Scaffold(
               appBar: AppBar(
+                backgroundColor: Colors.white, // Biały pasek
+                iconTheme: const IconThemeData(
+                    color: Colors.black), // Czarna strzałka powrotu
+                titleTextStyle: T.h3,
                 title: Text(habitData['name'] ?? 'Habit Statistics'),
+                elevation: 0, // Opcjonalnie: usuwa cień pod AppBar
               ),
               body: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -533,14 +541,14 @@ class HabitStatisticsScreenState extends State<HabitStatisticsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    const Text(
-                      "Calendar",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    buildMonthCalendar(comps),
-                    const SizedBox(height: 16),
+                    // const Text(
+                    //   "Calendar",
+                    //   style:
+                    //       TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    // ),
+                    // const SizedBox(height: 8),
+                    // buildMonthCalendar(comps),
+                    // const SizedBox(height: 16),
 
                     // Bar Chart section.
                     const Text(
