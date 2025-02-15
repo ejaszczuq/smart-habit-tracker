@@ -433,11 +433,22 @@ class _EditHabitScreenState extends State<EditHabitScreen> {
   /// Opens a dialog to pick a new icon.
   void _openIconPicker() {
     final List<Map<String, dynamic>> icons = [
-      {'icon': Icons.run_circle, 'label': 'Running'},
+      {'icon': Icons.directions_run, 'label': 'Running'},
       {'icon': Icons.directions_walk, 'label': 'Walking'},
       {'icon': Icons.fitness_center, 'label': 'Fitness'},
-      {'icon': Icons.sports, 'label': 'Sports'},
-      {'icon': Icons.directions_bike_sharp, 'label': 'Cycling'},
+      {'icon': Icons.sports_basketball, 'label': 'Basketball'},
+      {'icon': Icons.directions_bike, 'label': 'Cycling'},
+      {'icon': Icons.spa, 'label': 'Meditation'},
+      {'icon': Icons.self_improvement, 'label': 'Self-improvement'},
+      {'icon': Icons.book, 'label': 'Reading'},
+      {'icon': Icons.music_note, 'label': 'Music'},
+      {'icon': Icons.code, 'label': 'Coding'},
+      {'icon': Icons.work, 'label': 'Work'},
+      {'icon': Icons.brush, 'label': 'Art'},
+      {'icon': Icons.food_bank, 'label': 'Healthy Eating'},
+      {'icon': Icons.water, 'label': 'Drinking Water'},
+      {'icon': Icons.local_florist, 'label': 'Gardening'},
+      {'icon': Icons.nightlight_round, 'label': 'Sleep'},
     ];
 
     showDialog(
