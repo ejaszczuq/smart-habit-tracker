@@ -1,25 +1,23 @@
 import 'dart:io' show Platform;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:smart_habit_tracker/navigation/main_navigation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:smart_habit_tracker/screens/loading_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
 
-// For Google Sign-In
-import 'package:google_sign_in/google_sign_in.dart';
-// For Apple Sign-In
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+/// Displays the login form and handles user authentication using email/password, Google Sign-In, and Apple Sign-In.
 class LoginScreen extends StatefulWidget {
-  final VoidCallback onToggle;
-  const LoginScreen({Key? key, required this.onToggle}) : super(key: key);
+  final VoidCallback onToggle; // Called to switch to the register form
+
+  const LoginScreen({super.key, required this.onToggle});
 
   @override
-  State<StatefulWidget> createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -27,13 +25,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isPasswordVisible = false;
   bool isKeyboardOpen = false;
 
-  TextEditingController emailController = TextEditingController();
-  TextEditingController passwordController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
-  FocusNode emailFocusNode = FocusNode();
-  FocusNode passwordFocusNode = FocusNode();
+  final FocusNode emailFocusNode = FocusNode();
+  final FocusNode passwordFocusNode = FocusNode();
 
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -42,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
     passwordFocusNode.addListener(_handleFocusChange);
   }
 
-  // Detect keyboard open/close to adjust UI elements
+  /// Determines whether the keyboard is open/closed to adjust UI elements.
   void _handleFocusChange() {
     if (emailFocusNode.hasFocus || passwordFocusNode.hasFocus) {
       setState(() {
@@ -66,12 +64,13 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       email = emailController.text.trim();
       password = passwordController.text.trim();
-
-      await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password);
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
       if (!mounted) return;
-      // Navigate to the LoadingScreen which will then redirect to MainNavigation
+      // Navigate to a loading screen that then redirects to the main navigation.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoadingScreen()),
@@ -80,11 +79,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       String errorMessage = 'An unknown error occurred. Please try again.';
       if (e.code == 'user-not-found') {
-        errorMessage = 'No User Found for that Email';
+        errorMessage = 'No user found for that email.';
       } else if (e.code == 'wrong-password') {
-        errorMessage = 'Wrong Password';
+        errorMessage = 'Wrong password.';
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: T.violet_1,
@@ -105,10 +103,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Displays a dialog to reset the password.
+  /// Shows a dialog to reset the password by email.
   Future<void> _showResetPasswordDialog() async {
     final TextEditingController resetEmailController =
-        TextEditingController(text: emailController.text.trim());
+    TextEditingController(text: emailController.text.trim());
 
     await showDialog(
       context: context,
@@ -153,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            e.message ?? 'Error sending reset email',
+                            e.message ?? 'Error sending reset email.',
                             style: const TextStyle(fontSize: 16),
                           ),
                         ),
@@ -182,16 +180,15 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      await googleUser.authentication;
 
-      // Create credential for Firebase authentication
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
       final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      await FirebaseAuth.instance.signInWithCredential(credential);
 
       // If the user is new, add their info to Firestore
       if (userCredential.additionalUserInfo?.isNewUser == true) {
@@ -204,7 +201,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
-      // Navigate to LoadingScreen after successful sign-in
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoadingScreen()),
@@ -256,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
 
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
@@ -268,7 +264,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
-      // Navigate to LoadingScreen after successful Apple sign-in
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoadingScreen()),
@@ -330,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
-            // MAIN CONTENT
+            /// Main content with form
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -356,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         key: _formKey,
                         child: Column(
                           children: [
-                            // EMAIL
+                            /// Email
                             SizedBox(
                               width: 305,
                               child: TextFormField(
@@ -366,8 +361,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   labelText: 'Email',
                                   hintText: 'email@example.com',
                                   prefixIcon: Padding(
-                                    padding: const EdgeInsets.only(
-                                        left: 0, right: 10),
+                                    padding:
+                                    const EdgeInsets.only(right: 10),
                                     child: ShaderMask(
                                       shaderCallback: (Rect bounds) {
                                         return T.gradient_0
@@ -376,25 +371,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                       blendMode: BlendMode.srcIn,
                                       child: SvgPicture.asset(
                                         'assets/icons/email-icon.svg',
-                                        color: T.white_1,
                                       ),
                                     ),
                                   ),
-                                  prefixIconConstraints: const BoxConstraints(
-                                      minWidth: 30, minHeight: 30),
-                                  contentPadding: const EdgeInsets.only(
-                                      top: 10, bottom: 10),
+                                  prefixIconConstraints:
+                                  const BoxConstraints(
+                                    minWidth: 30,
+                                    minHeight: 30,
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Please enter your email';
+                                    return 'Please enter your email.';
                                   }
                                   return null;
                                 },
                               ),
                             ),
                             const SizedBox(height: 16.0),
-                            // PASSWORD
+                            /// Password
                             SizedBox(
                               width: 305,
                               child: TextFormField(
@@ -405,8 +400,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   labelText: 'Password',
                                   hintText: '*******',
                                   prefixIcon: Padding(
-                                    padding: const EdgeInsets.only(
-                                        left: 0, right: 10),
+                                    padding:
+                                    const EdgeInsets.only(right: 10),
                                     child: ShaderMask(
                                       shaderCallback: (Rect bounds) {
                                         return T.gradient_0
@@ -421,7 +416,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   suffixIcon: GestureDetector(
                                     onTap: () {
                                       setState(() {
-                                        isPasswordVisible = !isPasswordVisible;
+                                        isPasswordVisible =
+                                        !isPasswordVisible;
                                       });
                                     },
                                     child: Icon(
@@ -431,21 +427,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                       color: T.grey_1,
                                     ),
                                   ),
-                                  prefixIconConstraints: const BoxConstraints(
-                                      minWidth: 30, minHeight: 30),
-                                  contentPadding: const EdgeInsets.only(
-                                      top: 10, bottom: 10),
+                                  prefixIconConstraints:
+                                  const BoxConstraints(
+                                    minWidth: 30,
+                                    minHeight: 30,
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Please enter your password';
+                                    return 'Please enter your password.';
                                   }
                                   return null;
                                 },
                               ),
                             ),
                             const SizedBox(height: 8.0),
-                            // FORGOT PASSWORD
+                            /// Forgot password link
                             SizedBox(
                               width: 305,
                               child: Row(
@@ -455,14 +452,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                     onTap: _showResetPasswordDialog,
                                     child: const Text(
                                       'Forgot Password?',
-                                      style: TextStyle(color: T.violet_0),
+                                      style:
+                                      TextStyle(color: T.violet_0),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 20.0),
-                            // LOGIN BUTTON
+                            /// Login button
                             SizedBox(
                               width: 315,
                               child: CustomButton(
@@ -476,7 +474,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 20.0),
-                            // GOOGLE & APPLE SIGN-IN
+                            /// Google & Apple sign-in
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -486,9 +484,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                     padding: const EdgeInsets.all(8.0),
                                     decoration: BoxDecoration(
                                       color: Colors.white30,
-                                      border:
-                                          Border.all(color: T.grey_0, width: 1),
-                                      borderRadius: BorderRadius.circular(12.0),
+                                      border: Border.all(
+                                          color: T.grey_0, width: 1),
+                                      borderRadius:
+                                      BorderRadius.circular(12.0),
                                     ),
                                     child: SizedBox(
                                       width: 30,
@@ -511,7 +510,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         border: Border.all(
                                             color: T.grey_0, width: 1),
                                         borderRadius:
-                                            BorderRadius.circular(12.0),
+                                        BorderRadius.circular(12.0),
                                       ),
                                       child: SizedBox(
                                         width: 30,
@@ -526,7 +525,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             const SizedBox(height: 16.0),
-                            // TERMS / PRIVACY REMINDER
+                            /// Terms / Privacy reminder
                             AnimatedOpacity(
                               opacity: isKeyboardOpen ? 0.0 : 1.0,
                               duration: const Duration(milliseconds: 180),
@@ -542,7 +541,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     children: [
                                       const TextSpan(
                                           text:
-                                              'By logging, you are agreeing with our\n'),
+                                          'By logging, you are agreeing with our\n'),
                                       TextSpan(
                                         text: 'Terms of Use',
                                         style: T.captionSmall.copyWith(
@@ -551,7 +550,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () {
-                                            print('Terms of Use clicked');
+                                            debugPrint(
+                                                'Terms of Use clicked');
                                           },
                                       ),
                                       const TextSpan(text: ' and '),
@@ -563,7 +563,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () {
-                                            print('Privacy Policy clicked');
+                                            debugPrint(
+                                                'Privacy Policy clicked');
                                           },
                                       ),
                                     ],
@@ -579,7 +580,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-            // FOOTER: Switch to Register
+            /// Footer: switch to Register
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),

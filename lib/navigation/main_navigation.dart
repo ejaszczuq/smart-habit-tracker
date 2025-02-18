@@ -4,6 +4,7 @@ import 'package:smart_habit_tracker/screens/habits_screen.dart';
 import 'package:smart_habit_tracker/screens/home_screen.dart';
 import 'package:smart_habit_tracker/widgets/bottom_nav_bar.dart';
 
+/// Main navigation with three screens: Home, CreateHabit, and Habits.
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -14,17 +15,16 @@ class MainNavigation extends StatefulWidget {
 class MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
-  // We only keep 3 screens: Home, CreateHabit, Habits
   final List<Widget> _screens = [
-    const HomeScreen(),          // index 0
-    const CreateHabitScreen(),   // index 1
-    const HabitsScreen(),        // index 2
+    const HomeScreen(),        // index 0
+    const CreateHabitScreen(), // index 1 (pushed modally or replaced, see below)
+    const HabitsScreen(),      // index 2
   ];
 
+  /// Called when a bottom navigation item is tapped.
   void _onItemTapped(int index) {
-    // Center button => directly push the CreateHabitScreen,
-    // or we can do it by switching tabs. In this example we keep it simple:
     if (index == 1) {
+      // Instead of switching tabs, we show CreateHabitScreen separately.
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const CreateHabitScreen()),

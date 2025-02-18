@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
+/// A custom gradient button with a text label. Uses the passed [ButtonStyle] for text styling.
 class CustomButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -14,10 +16,30 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: style,
-      child: Text(text),
+    // Extract the textStyle from the provided ButtonStyle
+    final WidgetStateProperty<TextStyle?>? textStyleProperty = style.textStyle;
+    final TextStyle textStyle = textStyleProperty?.resolve({}) ??
+        const TextStyle(fontSize: 16, color: Colors.white);
+
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            colors: [T.purple_1, T.violet_0, T.blue_1],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: textStyle.copyWith(color: Colors.white),
+        ),
+      ),
     );
   }
 }

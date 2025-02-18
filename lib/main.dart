@@ -1,15 +1,16 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/auth/screens/login_register_screen.dart';
 import 'package:smart_habit_tracker/navigation/main_navigation.dart';
+import 'package:smart_habit_tracker/typography.dart';
 
+/// The entry point of the Flutter application.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(const MyApp() as Widget);
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -36,6 +37,7 @@ class MyApp extends StatelessWidget {
 class AuthenticationRouter extends StatelessWidget {
   const AuthenticationRouter({super.key});
 
+  /// Listens to FirebaseAuth changes to determine whether the user is logged in.
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -54,3 +56,5 @@ class AuthenticationRouter extends StatelessWidget {
     );
   }
 }
+
+

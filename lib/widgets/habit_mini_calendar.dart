@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
+/// A compact weekly calendar row showing completion states for a single habit across 7 days.
 class HabitMiniCalendar extends StatelessWidget {
   final Map<String, dynamic> habit;
   final List<DateTime> weekDates;
@@ -14,13 +15,12 @@ class HabitMiniCalendar extends StatelessWidget {
     required this.weekDates,
   });
 
-  /// Subscribes to completions in Firestore and interprets them all as doc.data()['completed'] = true/false.
-  /// No special logic for checklists. We treat them identically to yes/no.
+  /// Watches the 'completion' subcollection for the habit, reading the 'completed' field for each date doc.
   Stream<Map<String, bool>> watchCompletionStatus() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return Stream.value({});
-
     final habitId = habit['id'] as String;
+
     return FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -31,12 +31,10 @@ class HabitMiniCalendar extends StatelessWidget {
         .map((snapshot) {
       final completions = <String, bool>{};
       for (var doc in snapshot.docs) {
-        if (doc.exists) {
-          final docId = doc.id; // "yyyy-MM-dd"
-          final data = doc.data();
-          final isCompleted = data['completed'] ?? false;
-          completions[docId] = isCompleted;
-        }
+        final docId = doc.id; // e.g. "yyyy-MM-dd"
+        final data = doc.data();
+        final isCompleted = data['completed'] ?? false;
+        completions[docId] = isCompleted;
       }
       return completions;
     });
@@ -55,15 +53,15 @@ class HabitMiniCalendar extends StatelessWidget {
         final frequency = habit['frequency'] as Map<String, dynamic>? ?? {};
         final freqType = frequency['type'] as int? ?? 0;
 
-        // We'll store day -> 0 (empty), 1 (scheduled), 2 (completed)
+        /// We'll mark each day with an int state: 0=not relevant, 1=scheduled, 2=completed
         final dayStates = <String, int>{};
 
         if (freqType == 4) {
-          // type=4 => "X times per period"
+          /// Type=4 => "X times per period"
           final allowed = frequency['daysPerPeriod'] as int? ?? 1;
           int currentCount = 0;
 
-          // Count how many are already completed in this 7-day window.
+          /// Count how many are already completed in this 7-day window
           for (final day in weekDates) {
             final dateKey = DateFormat('yyyy-MM-dd').format(day);
             if (completions[dateKey] == true) {
@@ -71,36 +69,38 @@ class HabitMiniCalendar extends StatelessWidget {
             }
           }
 
-          // Determine future or past
+          /// Mark states
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
 
           for (final day in weekDates) {
             final dateKey = DateFormat('yyyy-MM-dd').format(day);
-            if (completions[dateKey] == true) {
+            final bool done = completions[dateKey] == true;
+
+            if (done) {
               dayStates[dateKey] = 2; // completed
             } else {
               if (day.isBefore(today)) {
-                // Past day and not completed
+                // Past
                 dayStates[dateKey] = 0;
               } else {
-                // Today or future day
+                // Future or today
                 if (currentCount < allowed) {
-                  dayStates[dateKey] = 1; // scheduled
+                  dayStates[dateKey] = 1;
                   currentCount++;
                 } else {
-                  dayStates[dateKey] = 0; // no more slots
+                  dayStates[dateKey] = 0;
                 }
               }
             }
           }
         } else {
-          // Other frequency types
+          /// Other frequencies
           for (final day in weekDates) {
             final dateKey = DateFormat('yyyy-MM-dd').format(day);
-            final isDone = completions[dateKey] == true;
+            final bool done = completions[dateKey] == true;
 
-            if (isDone) {
+            if (done) {
               dayStates[dateKey] = 2;
             } else if (_isScheduled(day)) {
               dayStates[dateKey] = 1;
@@ -110,7 +110,6 @@ class HabitMiniCalendar extends StatelessWidget {
           }
         }
 
-        // Render mini calendar
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: weekDates.map((day) {
@@ -165,7 +164,6 @@ class HabitMiniCalendar extends StatelessWidget {
     );
   }
 
-  /// Checks if habit is "scheduled" on [day], ignoring completion.
   bool _isScheduled(DateTime day) {
     final frequency = habit['frequency'] as Map<String, dynamic>? ?? {};
     final type = frequency['type'] as int? ?? 0;
@@ -177,18 +175,15 @@ class HabitMiniCalendar extends StatelessWidget {
         final daysOfWeek = (frequency['daysOfWeek'] as List<dynamic>?) ?? [];
         final dayLabel = DateFormat('EEE').format(day);
         return daysOfWeek.contains(dayLabel);
-
       case 2: // specific days of the month
         final daysOfMonth = (frequency['daysOfMonth'] as List<dynamic>?) ?? [];
         return daysOfMonth.contains(day.day);
-
       case 3: // specific days of the year
         final specificDates =
             (frequency['specificDates'] as List<dynamic>?) ?? [];
         final formatted = DateFormat('MMMM d').format(day);
         return specificDates.contains(formatted);
-
-      case 5: // repeat every X days
+      case 5: // repeat
         final startDateRaw = frequency['startDate'];
         if (startDateRaw == null) return false;
         final startDate = _parseDate(startDateRaw);
@@ -196,10 +191,8 @@ class HabitMiniCalendar extends StatelessWidget {
 
         final interval = frequency['interval'] as int? ?? 1;
         if (day.isBefore(startDate)) return false;
-
         final diff = day.difference(startDate).inDays;
         return (diff % interval == 0);
-
       default:
         return false;
     }
@@ -214,3 +207,5 @@ class HabitMiniCalendar extends StatelessWidget {
     return null;
   }
 }
+
+

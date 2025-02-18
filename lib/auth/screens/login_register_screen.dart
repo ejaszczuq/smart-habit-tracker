@@ -4,7 +4,7 @@ import 'package:smart_habit_tracker/auth/screens/login_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
-  const LoginRegisterScreen({Key? key}) : super(key: key);
+  const LoginRegisterScreen({super.key});
 
   @override
   State<LoginRegisterScreen> createState() => _LoginRegisterScreenState();
@@ -13,8 +13,8 @@ class LoginRegisterScreen extends StatefulWidget {
 class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
   bool isLogin = true;
 
-  // Toggle between login and register forms
-  void toggle() {
+  /// Toggles between the login and register forms.
+  void toggleForm() {
     setState(() {
       isLogin = !isLogin;
     });
@@ -31,12 +31,11 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Toggle button for switching forms
+          /// Button that lets you switch between the LoginScreen and RegisterScreen.
           Padding(
-            padding:
-                const EdgeInsets.only(bottom: 30.0, left: 16.0, right: 16.0),
+            padding: const EdgeInsets.only(bottom: 30.0, left: 16.0, right: 16.0),
             child: GestureDetector(
-              onTap: toggle,
+              onTap: toggleForm,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 height: 50,
@@ -48,9 +47,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                 child: Stack(
                   children: [
                     AnimatedAlign(
-                      alignment: isLogin
-                          ? Alignment.centerLeft
-                          : Alignment.centerRight,
+                      alignment:
+                      isLogin ? Alignment.centerLeft : Alignment.centerRight,
                       duration: const Duration(milliseconds: 300),
                       child: Container(
                         height: 50,
@@ -62,7 +60,6 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                       ),
                     ),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Center(
@@ -93,13 +90,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
               ),
             ),
           ),
-          // Switch between LoginScreen and RegisterScreen
+          /// Switches between LoginScreen and RegisterScreen based on the isLogin flag.
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
               child: isLogin
-                  ? LoginScreen(onToggle: toggle)
-                  : RegisterScreen(onToggle: toggle),
+                  ? LoginScreen(onToggle: toggleForm)
+                  : RegisterScreen(onToggle: toggleForm),
             ),
           ),
         ],

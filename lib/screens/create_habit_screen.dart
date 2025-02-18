@@ -1,52 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../typography.dart';
-import '../services/user_service.dart';
+import 'package:flutter/material.dart';
+import 'package:smart_habit_tracker/services/user_service.dart';
+import 'package:smart_habit_tracker/typography.dart';
+import 'package:smart_habit_tracker/widgets/custom_button.dart';
 
-class CustomButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-  final ButtonStyle style;
-
-  const CustomButton({
-    super.key,
-    required this.text,
-    required this.onPressed,
-    required this.style,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final MaterialStateProperty<TextStyle?>? textStyleProperty =
-        style.textStyle;
-    final TextStyle textStyle = textStyleProperty?.resolve({}) ??
-        const TextStyle(fontSize: 16, color: Colors.white);
-
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: const LinearGradient(
-            colors: [T.purple_1, T.violet_0, T.blue_1],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: textStyle.copyWith(color: Colors.white),
-        ),
-      ),
-    );
-  }
-}
-
-/// Screen for creating a new habit, supporting both Yes/No and Checklist evaluation methods.
+/// Screen for creating a new habit, supporting both Yes/No and Checklist.
 class CreateHabitScreen extends StatefulWidget {
   const CreateHabitScreen({super.key});
 
@@ -65,14 +24,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   String selectedIconLabel = '';
   IconData? selectedIcon;
   String selectedColorLabel = '';
-  Color? selectedColor; // remains null initially
+  Color? selectedColor;
 
   // Evaluation method: 'Yes/No' or 'Checklist'
   String _evaluationMethod = '';
 
-  // Checklist items (only adding and removing; checking off will be done elsewhere)
+  // Checklist items
   final TextEditingController _checklistItemController =
-      TextEditingController();
+  TextEditingController();
   final List<String> _checklistItems = [];
 
   // Frequency
@@ -81,48 +40,43 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
   final Set<int> _selectedDaysOfMonth = {};
   final List<String> _selectedDates = [];
   final TextEditingController _daysPerPeriodController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _repeatIntervalController =
-      TextEditingController();
+  TextEditingController();
   String? _selectedPeriod;
 
   // Reminders
-  final TextEditingController _reminderTimeController = TextEditingController();
+  final TextEditingController _reminderTimeController =
+  TextEditingController();
   String _reminderFrequency = 'Every day';
   bool _remindersEnabled = false;
 
-  /// Creates the habit document in Firestore
+  /// Creates the habit document in Firestore.
   Future<void> _createHabit() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('No user logged in');
+      debugPrint('No user logged in');
       return;
     }
 
     if (_nameController.text.isEmpty || _evaluationMethod.isEmpty) {
-      print('Please fill in all required fields');
+      debugPrint('Please fill in all required fields');
       return;
     }
 
-    // Convert user-chosen frequency string to an int
     final int freqType = _frequencyStringToInt(_selectedFrequency);
 
-    // Prepare the habit data
     final Map<String, dynamic> habitData = {
       'name': _nameController.text.trim(),
       'description': _descriptionController.text.trim(),
       'icon': selectedIconLabel,
       'color': selectedColorLabel,
       'evaluationMethod': _evaluationMethod,
-
-      // If it's a Checklist, store subTasks (without status)
       if (_evaluationMethod == 'Checklist') 'subTasks': _checklistItems,
-
       'frequency': {
         'type': freqType,
-        'daysOfWeek': _selectedDaysOfWeek.isNotEmpty
-            ? _selectedDaysOfWeek.toList()
-            : null,
+        'daysOfWeek':
+        _selectedDaysOfWeek.isNotEmpty ? _selectedDaysOfWeek.toList() : null,
         'daysOfMonth': _selectedDaysOfMonth.isNotEmpty
             ? _selectedDaysOfMonth.toList()
             : null,
@@ -136,17 +90,15 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
             : null,
         'startDate': DateTime.now().toIso8601String(),
       },
-
       'reminders': {
         'enabled': _remindersEnabled,
         'time': _reminderTimeController.text.trim(),
         'frequency': _reminderFrequency,
       },
-
       'createdAt': FieldValue.serverTimestamp(),
     };
 
-    // Remove null entries from frequency map
+    // Remove null entries
     habitData['frequency'].removeWhere((key, value) => value == null);
 
     try {
@@ -156,11 +108,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       );
       Navigator.pop(context);
     } catch (e) {
-      print('Error creating habit: $e');
+      debugPrint('Error creating habit: $e');
     }
   }
 
-  /// Converts frequency string (e.g. "Every day") to an int recognized by the calendar logic.
+  /// Converts a frequency string to an integer recognized by the logic.
   int _frequencyStringToInt(String? freq) {
     switch (freq) {
       case "Every day":
@@ -176,171 +128,29 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
       case "Repeat":
         return 5;
       default:
-        return 0; // fallback
+        return 0;
     }
   }
 
-  /// Builds a Card section with a title and child widget.
+  /// Builds a Card section with a given title and child widget.
   Widget _buildSection({required String title, required Widget child}) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: Colors.white.withOpacity(0.9),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: T.bodyRegularBold),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: T.bodyRegularBold),
+          const SizedBox(height: 12),
+          child,
+        ]),
       ),
     );
   }
 
-  // -----------------------
-  // ICON AND COLOR PICKERS
-  // -----------------------
-
-  Widget _buildIconAndColorPickerSection() {
-    return Row(
-      children: [
-        // Icon Picker
-        Expanded(
-          child: GestureDetector(
-            onTap: _openIconPicker,
-            child: Container(
-              height: 70,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12), // Adjust padding
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.grey.shade200,
-                    ),
-                    child: Icon(
-                      selectedIcon ?? Icons.help_outline,
-                      size: 24,
-                      color: selectedIcon == null ? Colors.grey : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start, // Align text to left
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        selectedIconLabel.isNotEmpty
-                            ? selectedIconLabel
-                            : "Pick an icon",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color:
-                              selectedIcon == null ? Colors.grey : Colors.black,
-                        ),
-                      ),
-                      Text(
-                        "Icon",
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-
-        // Color Picker
-        Expanded(
-          child: GestureDetector(
-            onTap: _openColorPicker,
-            child: Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    spreadRadius: 2,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: selectedColor ?? Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: selectedColor == null
-                        ? const Icon(Icons.palette, color: Colors.white)
-                        : null,
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        selectedColorLabel.isNotEmpty
-                            ? selectedColorLabel
-                            : "Pick a color",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: selectedColor == null
-                              ? Colors.grey
-                              : Colors.black,
-                        ),
-                      ),
-                      Text(
-                        "Color",
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
+  /// Lets the user pick an icon for the habit.
   void _openIconPicker() {
     final List<Map<String, dynamic>> icons = [
       {'icon': Icons.directions_run, 'label': 'Running'},
@@ -387,14 +197,19 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                           shape: BoxShape.circle,
                           color: Colors.grey.shade200,
                         ),
-                        child: Icon(iconData['icon'],
-                            size: 32, color: Colors.black87),
+                        child: Icon(
+                          iconData['icon'],
+                          size: 32,
+                          color: Colors.black87,
+                        ),
                       ),
                       const SizedBox(height: 5),
                       Text(
                         iconData['label'],
                         style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w500),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -407,6 +222,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
+  /// Lets the user pick a color for the habit.
   void _openColorPicker() {
     final List<Map<String, dynamic>> colors = [
       {'color': Colors.red, 'label': 'Red'},
@@ -450,9 +266,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  // -----------------------------------
-  // REMINDERS
-  // -----------------------------------
+  /// Reminders builder
   Widget _buildRemindersSection() {
     return Row(
       children: [
@@ -465,8 +279,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   enabled: _remindersEnabled,
                   controller: _reminderTimeController,
                   decoration: InputDecoration(
-                    prefixIcon:
-                        const Icon(Icons.access_time, color: T.purple_1),
+                    prefixIcon: const Icon(Icons.access_time, color: T.purple_1),
                     hintText: 'Time',
                     enabledBorder: OutlineInputBorder(
                       borderSide: const BorderSide(color: Colors.grey),
@@ -477,7 +290,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     contentPadding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   ),
                   style: const TextStyle(fontSize: 14),
                 ),
@@ -488,14 +301,14 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                   value: _reminderFrequency,
                   onChanged: _remindersEnabled
                       ? (value) {
-                          setState(() {
-                            _reminderFrequency = value!;
-                          });
-                        }
+                    setState(() {
+                      _reminderFrequency = value!;
+                    });
+                  }
                       : null,
                   items: ['Every day', 'Specific day']
                       .map((freq) =>
-                          DropdownMenuItem(value: freq, child: Text(freq)))
+                      DropdownMenuItem(value: freq, child: Text(freq)))
                       .toList(),
                   isExpanded: true,
                 ),
@@ -517,9 +330,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  // -----------------------------------
-  // FREQUENCY
-  // -----------------------------------
+  /// Frequency builder
   Widget _buildFrequencySection() {
     final List<String> frequencies = [
       "Every day",
@@ -545,10 +356,10 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           items: frequencies
               .map(
                 (freq) => DropdownMenuItem(
-                  value: freq,
-                  child: Text(freq),
-                ),
-              )
+              value: freq,
+              child: Text(freq),
+            ),
+          )
               .toList(),
         ),
         if (_selectedFrequency != null)
@@ -557,6 +368,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
+  /// Shows UI for configuring the selected frequency type.
   Widget _buildConfigurationWidgetForFrequency(String frequency) {
     switch (frequency) {
       case "Specific days of the week":
@@ -584,26 +396,27 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           spacing: 8,
           children: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
               .map((day) => FilterChip(
-                    label: Text(day),
-                    selected: _selectedDaysOfWeek.contains(day),
-                    selectedColor: T.violet_2.withOpacity(0.2),
-                    side: MaterialStateBorderSide.resolveWith((states) {
-                      if (states.contains(MaterialState.selected)) {
-                        return const BorderSide(color: T.violet_2, width: 1.5);
-                      }
-                      return BorderSide(
-                          color: Colors.grey.shade300, width: 1.0);
-                    }),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedDaysOfWeek.add(day);
-                        } else {
-                          _selectedDaysOfWeek.remove(day);
-                        }
-                      });
-                    },
-                  ))
+            label: Text(day),
+            selected: _selectedDaysOfWeek.contains(day),
+            selectedColor: T.violet_2.withOpacity(0.2),
+            side: WidgetStateBorderSide.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const BorderSide(
+                    color: T.violet_2, width: 1.5);
+              }
+              return BorderSide(
+                  color: Colors.grey.shade300, width: 1.0);
+            }),
+            onSelected: (selected) {
+              setState(() {
+                if (selected) {
+                  _selectedDaysOfWeek.add(day);
+                } else {
+                  _selectedDaysOfWeek.remove(day);
+                }
+              });
+            },
+          ))
               .toList(),
         ),
       ],
@@ -620,26 +433,27 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           spacing: 8,
           children: List.generate(31, (index) => index + 1)
               .map((day) => FilterChip(
-                    label: Text('$day'),
-                    selected: _selectedDaysOfMonth.contains(day),
-                    selectedColor: T.violet_2.withOpacity(0.2),
-                    side: MaterialStateBorderSide.resolveWith((states) {
-                      if (states.contains(MaterialState.selected)) {
-                        return const BorderSide(color: T.violet_2, width: 1.5);
-                      }
-                      return BorderSide(
-                          color: Colors.grey.shade300, width: 1.0);
-                    }),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedDaysOfMonth.add(day);
-                        } else {
-                          _selectedDaysOfMonth.remove(day);
-                        }
-                      });
-                    },
-                  ))
+            label: Text('$day'),
+            selected: _selectedDaysOfMonth.contains(day),
+            selectedColor: T.violet_2.withOpacity(0.2),
+            side: WidgetStateBorderSide.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const BorderSide(
+                    color: T.violet_2, width: 1.5);
+              }
+              return BorderSide(
+                  color: Colors.grey.shade300, width: 1.0);
+            }),
+            onSelected: (selected) {
+              setState(() {
+                if (selected) {
+                  _selectedDaysOfMonth.add(day);
+                } else {
+                  _selectedDaysOfMonth.remove(day);
+                }
+              });
+            },
+          ))
               .toList(),
         ),
       ],
@@ -650,7 +464,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     int selectedMonth = 1;
     int selectedDay = 1;
 
-    final monthDays = {
+    final Map<int, int> monthDays = {
       1: 31,
       2: 29,
       3: 31,
@@ -670,15 +484,15 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
+          builder: (dialogCtx, setDialogState) {
             return AlertDialog(
               title: const Text("Select Month and Day"),
               content: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Month
+                  /// Month picker
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -746,7 +560,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                     ),
                   ),
                   const SizedBox(width: 20),
-                  // Day
+                  /// Day picker
                   Expanded(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -766,7 +580,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                             },
                             childDelegate: ListWheelChildLoopingListDelegate(
                               children:
-                                  List.generate(monthDays[selectedMonth]!, (i) {
+                              List.generate(monthDays[selectedMonth]!, (i) {
                                 return GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
@@ -942,9 +756,7 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  // -----------------------------------
-  // EVALUATION METHOD (Yes/No, Checklist)
-  // -----------------------------------
+  /// Builds the evaluation method section, either "Yes/No" or "Checklist."
   Widget _buildEvaluationMethodSection() {
     final List<Map<String, dynamic>> evaluationMethods = [
       {'icon': Icons.toggle_on, 'label': 'Yes/No'},
@@ -974,14 +786,13 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
           );
-        }).toList(),
-        // If 'Checklist', show the sub-task fields (without habit complete status)
+        }),
         if (_evaluationMethod == 'Checklist') _buildChecklistFields(),
       ],
     );
   }
 
-  /// Build UI for adding sub-tasks if evaluationMethod == 'Checklist'
+  /// Build UI for adding sub-tasks if the method is 'Checklist.'
   Widget _buildChecklistFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,7 +802,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        // List of subtasks (displayed as list tiles with delete button)
         Column(
           children: _checklistItems.asMap().entries.map((entry) {
             int index = entry.key;
@@ -1050,9 +860,6 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
     );
   }
 
-  // -----------------------------------
-  // BUILD
-  // -----------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1093,11 +900,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                         labelText: 'Name',
                         prefixIcon: Icon(Icons.text_format, color: T.purple_0),
                         enabledBorder: UnderlineInputBorder(
-                          borderSide:
-                              BorderSide(color: Colors.grey, width: 0.5),
+                          borderSide: BorderSide(color: Colors.grey, width: 0.5),
                         ),
                         focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: T.violet_0, width: 0.5),
+                          borderSide:
+                          BorderSide(color: T.violet_0, width: 0.5),
                         ),
                       ),
                     ),
@@ -1108,11 +915,11 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
                         labelText: 'Description',
                         prefixIcon: Icon(Icons.notes, color: T.violet_0),
                         enabledBorder: UnderlineInputBorder(
-                          borderSide:
-                              BorderSide(color: Colors.grey, width: 0.5),
+                          borderSide: BorderSide(color: Colors.grey, width: 0.5),
                         ),
                         focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: T.violet_0, width: 0.5),
+                          borderSide:
+                          BorderSide(color: T.violet_0, width: 0.5),
                         ),
                       ),
                     ),
@@ -1121,7 +928,138 @@ class _CreateHabitScreenState extends State<CreateHabitScreen> {
               ),
               _buildSection(
                 title: 'Icon and Color',
-                child: _buildIconAndColorPickerSection(),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _openIconPicker,
+                        child: Container(
+                          height: 70,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                spreadRadius: 2,
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.grey.shade200,
+                                ),
+                                child: Icon(
+                                  selectedIcon ?? Icons.help_outline,
+                                  size: 24,
+                                  color: selectedIcon == null
+                                      ? Colors.grey
+                                      : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    selectedIconLabel.isNotEmpty
+                                        ? selectedIconLabel
+                                        : "Pick an icon",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: selectedIcon == null
+                                          ? Colors.grey
+                                          : Colors.black,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Icon",
+                                    style:
+                                    TextStyle(color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _openColorPicker,
+                        child: Container(
+                          height: 70,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                spreadRadius: 2,
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: selectedColor ?? Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: selectedColor == null
+                                    ? const Icon(Icons.palette,
+                                    color: Colors.white)
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    selectedColorLabel.isNotEmpty
+                                        ? selectedColorLabel
+                                        : "Pick a color",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: selectedColor == null
+                                          ? Colors.grey
+                                          : Colors.black,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Color",
+                                    style: TextStyle(
+                                        color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               _buildSection(
                 title: 'Evaluation Method',

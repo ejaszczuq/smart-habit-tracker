@@ -1,22 +1,23 @@
 import 'dart:io' show Platform;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:smart_habit_tracker/navigation/main_navigation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:smart_habit_tracker/screens/loading_screen.dart';
 import 'package:smart_habit_tracker/typography.dart';
 import 'package:smart_habit_tracker/widgets/custom_button.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+/// Displays the registration form and handles user creation with email/password, Google Sign-In, and Apple Sign-In.
 class RegisterScreen extends StatefulWidget {
-  final VoidCallback onToggle;
-  const RegisterScreen({Key? key, required this.onToggle}) : super(key: key);
+  final VoidCallback onToggle; // Called to switch to the login form
+
+  const RegisterScreen({super.key, required this.onToggle});
 
   @override
-  State<StatefulWidget> createState() => _RegisterScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
@@ -24,14 +25,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController =
-      TextEditingController();
+  TextEditingController();
 
   final FocusNode nameFocusNode = FocusNode();
   final FocusNode emailFocusNode = FocusNode();
   final FocusNode passwordFocusNode = FocusNode();
   final FocusNode confirmPasswordFocusNode = FocusNode();
 
-  final _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool isPasswordVisible = false;
   bool isConfirmPasswordVisible = false;
@@ -47,7 +48,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     confirmPasswordFocusNode.addListener(_handleFocusChange);
   }
 
-  // Detect keyboard open/close state to adjust UI
+  /// Adjust UI based on whether the keyboard is open or not.
   void _handleFocusChange() {
     if (nameFocusNode.hasFocus ||
         emailFocusNode.hasFocus ||
@@ -85,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  /// Registers a new user using email and password.
+  /// Creates a new user account with email and password.
   Future<void> registration() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -103,7 +104,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final UserCredential userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
@@ -115,7 +116,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      await user.updateProfile(displayName: nameController.text.trim());
+      // For older Firebase versions: user.updateProfile(...) might be deprecated;
+      // in newer versions, use user.updateDisplayName(...) or similar approach
+      await user.updateDisplayName(nameController.text.trim());
       await user.reload();
 
       if (!mounted) return;
@@ -128,19 +131,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
-      // Navigate to LoadingScreen which then redirects to MainNavigation
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoadingScreen()),
       );
     } on FirebaseAuthException catch (e) {
-      String errorMessage = '';
+      String errorMessage = 'An error occurred. Please try again.';
       if (e.code == 'weak-password') {
-        errorMessage = 'Password provided is too weak';
+        errorMessage = 'Password provided is too weak.';
       } else if (e.code == 'email-already-in-use') {
-        errorMessage = 'Account already exists';
-      } else {
-        errorMessage = 'An error occurred. Please try again.';
+        errorMessage = 'Account already exists.';
       }
 
       if (!mounted) return;
@@ -167,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /// Sign up using a Google account.
+  /// Signs up using Google.
   Future<void> signUpWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
@@ -175,7 +175,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
       final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
@@ -183,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      await FirebaseAuth.instance.signInWithCredential(credential);
 
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
@@ -220,7 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /// Sign up using an Apple account (iOS/macOS only).
+  /// Signs up using Apple (iOS/macOS only).
   Future<void> signUpWithApple() async {
     if (!Platform.isIOS && !Platform.isMacOS) {
       if (!mounted) return;
@@ -246,7 +246,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       final UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
 
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         final user = userCredential.user!;
@@ -283,7 +283,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  // Helper method to build input decoration for text fields.
+  /// Helper that builds basic input decoration with a prefix icon and optional suffix icon.
   InputDecoration _buildInputDecoration({
     required String label,
     required String hint,
@@ -294,7 +294,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       labelText: label,
       hintText: hint,
       prefixIcon: Padding(
-        padding: const EdgeInsets.only(left: 0, right: 10),
+        padding: const EdgeInsets.only(right: 10),
         child: ShaderMask(
           shaderCallback: (Rect bounds) {
             return T.gradient_0.createShader(bounds);
@@ -304,7 +304,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-      contentPadding: const EdgeInsets.only(top: 10, bottom: 10),
       suffixIcon: suffixIcon,
       errorStyle: const TextStyle(color: Colors.red, fontSize: 12),
     );
@@ -321,8 +320,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               Text('Create your account', style: T.h2),
               const SizedBox(height: 4),
-              Text('Fill in your details to sign up',
-                  style: T.bodyRegularBold.copyWith(color: T.grey_1)),
+              Text(
+                'Fill in your details to sign up',
+                style: T.bodyRegularBold.copyWith(color: T.grey_1),
+              ),
             ],
           ),
         ),
@@ -334,7 +335,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
-            // MAIN CONTENT with the registration form
+            /// Main content with the registration form
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -357,10 +358,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your name';
+                                  return 'Please enter your name.';
                                 }
                                 if (value.trim().length < 2) {
-                                  return 'Name is too short';
+                                  return 'Name is too short.';
                                 }
                                 return null;
                               },
@@ -379,12 +380,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your email';
+                                  return 'Please enter your email.';
                                 }
                                 final emailRegex =
-                                    RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                                 if (!emailRegex.hasMatch(value.trim())) {
-                                  return 'Please enter a valid email';
+                                  return 'Please enter a valid email.';
                                 }
                                 return null;
                               },
@@ -417,15 +418,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please enter your password';
+                                  return 'Please enter your password.';
                                 }
                                 if (value.length < 6) {
-                                  return 'Password must be at least 6 characters long';
+                                  return 'Password must be at least 6 characters long.';
                                 }
                                 final passwordRegex = RegExp(
                                     r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$');
                                 if (!passwordRegex.hasMatch(value)) {
-                                  return 'Password must include letters and numbers';
+                                  return 'Password must include letters and numbers.';
                                 }
                                 return null;
                               },
@@ -446,7 +447,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   onTap: () {
                                     setState(() {
                                       isConfirmPasswordVisible =
-                                          !isConfirmPasswordVisible;
+                                      !isConfirmPasswordVisible;
                                     });
                                   },
                                   child: Icon(
@@ -459,10 +460,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please confirm your password';
+                                  return 'Please confirm your password.';
                                 }
                                 if (value != passwordController.text) {
-                                  return 'Passwords do not match';
+                                  return 'Passwords do not match.';
                                 }
                                 return null;
                               },
@@ -486,7 +487,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20.0),
+                              const SizedBox(width: 5),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,12 +506,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             text: 'Terms of Use',
                                             style: const TextStyle(
                                               color: T.violet_0,
-                                              decoration:
-                                                  TextDecoration.underline,
+                                              decoration: TextDecoration.underline,
                                             ),
                                             recognizer: TapGestureRecognizer()
                                               ..onTap = () {
-                                                print('Terms of Use tapped');
+                                                debugPrint(
+                                                    'Terms of Use tapped');
                                               },
                                           ),
                                           const TextSpan(text: ' and '),
@@ -518,12 +519,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                             text: 'Privacy Policy',
                                             style: const TextStyle(
                                               color: T.violet_0,
-                                              decoration:
-                                                  TextDecoration.underline,
+                                              decoration: TextDecoration.underline,
                                             ),
                                             recognizer: TapGestureRecognizer()
                                               ..onTap = () {
-                                                print('Privacy Policy tapped');
+                                                debugPrint(
+                                                    'Privacy Policy tapped');
                                               },
                                           ),
                                           const TextSpan(text: '.'),
@@ -541,10 +542,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: CustomButton(
                               text: 'Sign Up',
                               onPressed: registration,
-                              style: T.buttonStandard.copyWith(
-                                backgroundColor:
-                                    WidgetStateProperty.all(T.violet_0),
-                              ),
+                              style: T.buttonStandard,
                             ),
                           ),
                           const SizedBox(height: 22.0),
@@ -562,7 +560,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   decoration: BoxDecoration(
                                     color: Colors.white30,
                                     border:
-                                        Border.all(color: T.grey_0, width: 1),
+                                    Border.all(color: T.grey_0, width: 1),
                                     borderRadius: BorderRadius.circular(16.0),
                                     boxShadow: [
                                       BoxShadow(
@@ -575,11 +573,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ),
                                   child: Row(
                                     mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                    MainAxisAlignment.spaceBetween,
                                     children: [
                                       Column(
                                         crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'Sign up',
@@ -614,8 +612,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: Colors.white30,
-                                      border:
-                                          Border.all(color: T.grey_0, width: 1),
+                                      border: Border.all(
+                                          color: T.grey_0, width: 1),
                                       borderRadius: BorderRadius.circular(16.0),
                                       boxShadow: [
                                         BoxShadow(
@@ -628,11 +626,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     ),
                                     child: Row(
                                       mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                      MainAxisAlignment.spaceBetween,
                                       children: [
                                         Column(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Sign up',
@@ -665,7 +663,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
-            // FOOTER: Switch to Login
+            /// Footer: switch to Login
             AnimatedOpacity(
               opacity: isKeyboardOpen ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),

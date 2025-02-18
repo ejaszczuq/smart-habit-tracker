@@ -1,16 +1,17 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/navigation/main_navigation.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
+/// A loading screen with animated icons and motivational text, redirecting to MainNavigation after a set time.
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({Key? key}) : super(key: key);
 
   @override
-  _LoadingScreenState createState() => _LoadingScreenState();
+  LoadingScreenState createState() => LoadingScreenState();
 }
 
-class _LoadingScreenState extends State<LoadingScreen>
+class LoadingScreenState extends State<LoadingScreen>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
   double _opacity = 0.0;
@@ -22,15 +23,15 @@ class _LoadingScreenState extends State<LoadingScreen>
   AnimationController? _glowController;
   late Animation<double> _glowAnimation;
 
-  // List of relevant Material Icons for habit tracking
+  /// Icons for the loading animation.
   final List<IconData> icons = [
-    Icons.check_circle_outline, // Habit completed
-    Icons.track_changes, // Tracking progress
-    Icons.auto_graph, // Growth and progress
-    Icons.access_time, // Time management
+    Icons.check_circle_outline,
+    Icons.track_changes,
+    Icons.auto_graph,
+    Icons.access_time,
   ];
 
-  // List of motivational phrases
+  /// Motivational phrases to show while loading.
   final List<String> motivationalTexts = [
     "Start small, dream big!",
     "Set. Track. Achieve.",
@@ -38,44 +39,38 @@ class _LoadingScreenState extends State<LoadingScreen>
     "One habit closer to greatness!"
   ];
 
+  bool _isDisposed = false;
+
   @override
   void initState() {
     super.initState();
     _startIconAnimation();
     _startTextAnimation();
 
-    // Glow Animation
     _glowController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 1))
-          ..repeat(reverse: true);
-    _glowAnimation =
-        Tween<double>(begin: 0.3, end: 1.0).animate(_glowController!);
+    AnimationController(vsync: this, duration: const Duration(seconds: 1))
+      ..repeat(reverse: true);
+    _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(_glowController!);
 
-    // Progress Bar Animation
     _progressController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 10))
-          ..forward();
+    AnimationController(vsync: this, duration: const Duration(seconds: 10))
+      ..forward();
     _progressAnimation =
         Tween<double>(begin: 0, end: 1).animate(_progressController);
 
-    // Automatically navigate to home after progress bar completion
-    Future.delayed(const Duration(seconds: 10), () {
-      _navigateToHome();
-    });
+    /// Auto-navigate to MainNavigation after 10 seconds
+    Future.delayed(const Duration(seconds: 10), _navigateToHome);
   }
 
-  // Starts the smooth looping icon animation
   void _startIconAnimation() {
     _iconTimer = Timer.periodic(const Duration(milliseconds: 700), (timer) {
       setState(() {
         _opacity = 1.0;
       });
-
       Future.delayed(const Duration(milliseconds: 500), () {
         setState(() {
           _opacity = 0.0;
         });
-
         Future.delayed(const Duration(milliseconds: 200), () {
           if (mounted) {
             setState(() {
@@ -87,7 +82,6 @@ class _LoadingScreenState extends State<LoadingScreen>
     });
   }
 
-  // Starts the animated text effect (switches every 3 seconds)
   void _startTextAnimation() {
     _textTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       setState(() {
@@ -96,7 +90,6 @@ class _LoadingScreenState extends State<LoadingScreen>
     });
   }
 
-  // Navigates to the home screen
   void _navigateToHome() {
     if (mounted) {
       _iconTimer.cancel();
@@ -109,13 +102,9 @@ class _LoadingScreenState extends State<LoadingScreen>
     }
   }
 
-  // Safe disposal of animation controllers
-  bool _isDisposed = false; // Track disposal status
-
   void _disposeAnimationControllers() {
     if (!_isDisposed) {
-      _isDisposed = true; // Prevent multiple disposals
-
+      _isDisposed = true;
       _glowController?.stop();
       _glowController?.dispose();
       _glowController = null;
@@ -138,7 +127,7 @@ class _LoadingScreenState extends State<LoadingScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF5E00E7), Color(0xFF9B00FF)], // Purple theme
+            colors: [Color(0xFF5E00E7), Color(0xFF9B00FF)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -146,7 +135,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Glowing Animated Icon
+            /// Glowing animated icon
             Center(
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 500),
@@ -160,8 +149,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color:
-                                Colors.white.withOpacity(_glowAnimation.value),
+                            color: Colors.white
+                                .withOpacity(_glowAnimation.value),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
@@ -178,8 +167,7 @@ class _LoadingScreenState extends State<LoadingScreen>
               ),
             ),
             const SizedBox(height: 40),
-
-            // Animated Motivational Text
+            /// Animated motivational text
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
               child: Text(
@@ -189,10 +177,8 @@ class _LoadingScreenState extends State<LoadingScreen>
                 style: T.h3.copyWith(color: T.white_0),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // Animated Progress Bar
+            /// Animated progress bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 70.0),
               child: AnimatedBuilder(
@@ -203,8 +189,9 @@ class _LoadingScreenState extends State<LoadingScreen>
                     child: LinearProgressIndicator(
                       value: _progressAnimation.value,
                       backgroundColor: Colors.white24,
-                      valueColor:
-                          const AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
                       minHeight: 6,
                     ),
                   );

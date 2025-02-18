@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+/// Simple pie chart displaying "done" vs. "failed" data from a map.
 class PieChartWidget extends StatelessWidget {
   final Map<String, double> data;
 
@@ -9,7 +10,6 @@ class PieChartWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<PieChartSectionData> sections = [];
-
     data.forEach((label, value) {
       Color color;
       if (label == "done") {
@@ -19,12 +19,11 @@ class PieChartWidget extends StatelessWidget {
       } else {
         color = Colors.grey.withOpacity(0.5);
       }
-
       sections.add(
         PieChartSectionData(
           color: color,
           value: value,
-          title: "${value.toInt()}",
+          title: value.toInt().toString(),
           radius: 50,
           titleStyle: const TextStyle(
             fontSize: 16,
@@ -44,3 +43,5 @@ class PieChartWidget extends StatelessWidget {
     );
   }
 }
+
+

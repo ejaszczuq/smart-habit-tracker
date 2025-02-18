@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/typography.dart';
-import '../widgets/habit_mini_calendar.dart';
-import 'edit_habit_screen.dart';
-import 'habit_statistics_screen.dart';
+import 'package:smart_habit_tracker/widgets/habit_mini_calendar.dart';
+import 'package:smart_habit_tracker/screens/edit_habit_screen.dart';
+import 'package:smart_habit_tracker/screens/habit_statistics_screen.dart';
 
+/// Screen that lists all habits in a card-based format, allowing quick access to statistics or editing.
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
 
@@ -16,7 +17,7 @@ class HabitsScreen extends StatefulWidget {
 class HabitsScreenState extends State<HabitsScreen> {
   DateTime selectedDate = DateTime.now();
 
-  /// Returns a list of 7 dates (the current week) based on selectedDate
+  /// Returns the 7 dates corresponding to the week of the currently selected date (Monday-Sunday).
   List<DateTime> getWeekDates() {
     int weekday = selectedDate.weekday; // 1=Mon, 7=Sun
     DateTime monday = selectedDate.subtract(Duration(days: weekday - 1));
@@ -41,12 +42,46 @@ class HabitsScreenState extends State<HabitsScreen> {
     }).toList();
   }
 
+  /// Shows a simple dialog with logout functionality.
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Settings', style: T.h3),
+          content: Text('Choose an action:', style: T.bodyRegular),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel',
+                  style: T.bodyRegularBold.copyWith(color: T.violet_0)),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await FirebaseAuth.instance.signOut();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Logged out successfully')),
+                );
+                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              },
+              child: Text('Logout',
+                  style: T.bodyRegularBold.copyWith(color: T.violet_0)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final weekDates = getWeekDates();
+
     return Scaffold(
       appBar: AppBar(
-        // AppBar with gradient background using typography colors
         title: Text('Habits Overview', style: T.h3),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -57,10 +92,9 @@ class HabitsScreenState extends State<HabitsScreen> {
           ),
         ),
         actions: [
-          // Gear icon in the top-right corner
           IconButton(
             icon: const Icon(Icons.settings, color: T.violet_0),
-            onPressed: () => _showSettingsDialog(),
+            onPressed: _showSettingsDialog,
           ),
         ],
       ),
@@ -76,8 +110,7 @@ class HabitsScreenState extends State<HabitsScreen> {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
                     return Center(
-                      child: Text('Error: ${snapshot.error}',
-                          style: T.bodyRegular),
+                      child: Text('Error: ${snapshot.error}', style: T.bodyRegular),
                     );
                   } else {
                     final habits = snapshot.data ?? [];
@@ -104,8 +137,8 @@ class HabitsScreenState extends State<HabitsScreen> {
                               children: [
                                 ListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(Icons.check,
-                                      color: T.violet_0),
+                                  leading:
+                                  const Icon(Icons.check, color: T.violet_0),
                                   title: Text(
                                     habit['name'] ?? 'No Name',
                                     style: T.bodyLargeBold,
@@ -126,7 +159,8 @@ class HabitsScreenState extends State<HabitsScreen> {
                                             MaterialPageRoute(
                                               builder: (context) =>
                                                   HabitStatisticsScreen(
-                                                      habit: habit),
+                                                    habit: habit,
+                                                  ),
                                             ),
                                           );
                                         },
@@ -148,8 +182,8 @@ class HabitsScreenState extends State<HabitsScreen> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16.0),
+                                  padding:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
                                   child: HabitMiniCalendar(
                                     habit: habit,
                                     weekDates: weekDates,
@@ -168,48 +202,6 @@ class HabitsScreenState extends State<HabitsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  /// Displays a simple dialog with "Logout" button. The logout logic
-  /// is the same as in ProfileScreen: we call signOut from FirebaseAuth.
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Text('Settings', style: T.h3),
-          content: Text('Choose an action:', style: T.bodyRegular),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel',
-                  style: T.bodyRegularBold.copyWith(color: T.violet_0)),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx); // close dialog
-                await FirebaseAuth.instance.signOut();
-
-                // After signOut, navigate back to the Auth router or main
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Logged out successfully')),
-                );
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/', // or your main route
-                  (route) => false,
-                );
-              },
-              child: Text('Logout',
-                  style: T.bodyRegularBold.copyWith(color: T.violet_0)),
-            ),
-          ],
-        );
-      },
     );
   }
 }

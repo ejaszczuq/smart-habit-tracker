@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:smart_habit_tracker/typography.dart';
 
+/// A custom bottom navigation bar with a large center button for adding a habit.
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
@@ -21,7 +22,7 @@ class BottomNavBar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.topCenter,
         children: [
-          // Navigation background
+          /// Navigation background
           Positioned(
             bottom: 0,
             left: 0,
@@ -31,15 +32,13 @@ class BottomNavBar extends StatelessWidget {
               decoration: const BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
-                  BoxShadow(
-                    color: T.black_1,
-                  ),
+                  BoxShadow(color: T.black_1),
                 ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  // LEFT ICON => Index 0 (Home)
+                  /// Left icon => index 0 (Home)
                   GestureDetector(
                     onTap: () => onTap(0),
                     child: Column(
@@ -60,11 +59,9 @@ class BottomNavBar extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // Spacer for the center button
+                  /// Center button spacer
                   const SizedBox(width: centerButtonSize),
-
-                  // RIGHT ICON => Index 2 (Profile - Habits)
+                  /// Right icon => index 2 (Profile - or Habits)
                   GestureDetector(
                     onTap: () => onTap(2),
                     child: Column(
@@ -89,8 +86,7 @@ class BottomNavBar extends StatelessWidget {
               ),
             ),
           ),
-
-          // CENTER BUTTON => Index 1 (Add Habit)
+          /// Large center button => index 1
           Positioned(
             top: 10,
             child: GestureDetector(
@@ -122,3 +118,5 @@ class BottomNavBar extends StatelessWidget {
     );
   }
 }
+
+
